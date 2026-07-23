@@ -5,6 +5,7 @@ import { Modal } from '@/components/Modal'
 import { PlayerCard } from '@/components/PlayerCard'
 import { ScoreRow } from '@/components/ScoreRow'
 import { StatusPanel } from '@/components/StatusPanel'
+import { TextField } from '@/components/TextField'
 
 const sectionClassName = 'grid gap-4 rounded-panel border border-border bg-surface p-5'
 
@@ -49,6 +50,22 @@ export function DevCatalog() {
           <Dice value={3} />
           <Dice value={5} held />
           <Dice value={6} rolling size="lg" />
+        </div>
+      </section>
+
+      <section className={sectionClassName}>
+        <h2 className="text-xl font-bold">Text field</h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <TextField
+            label="닉네임"
+            placeholder="느긋한 주사위"
+            helpText="비워두면 추천 이름을 사용해요."
+          />
+          <TextField
+            label="초대 코드"
+            defaultValue="YORR!"
+            errorMessage="특수문자는 사용할 수 없어요."
+          />
         </div>
       </section>
 
