@@ -59,15 +59,20 @@ export function createRealtimeFixture(options: RealtimeFixtureOptions = {}) {
         ]
       }
 
+      const joinedSession =
+        message.payload.sessionToken === participantSession.sessionToken
+          ? participantSession
+          : session
+
       return [
         serverMessage(
           'room.joined',
           {
-            you: session.you,
-            sessionToken: session.sessionToken,
-            snapshot: session.snapshot,
+            you: joinedSession.you,
+            sessionToken: joinedSession.sessionToken,
+            snapshot: joinedSession.snapshot,
           },
-          { roomId: session.roomId, msgId: message.msgId },
+          { roomId: joinedSession.roomId, msgId: message.msgId },
         ),
       ]
     },
