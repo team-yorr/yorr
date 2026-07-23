@@ -22,8 +22,8 @@ describe('EntryPage', () => {
     expect(useAppStore.getState().roomSession).toEqual({
       roomId: 'room-yorr-64',
       roomCode: 'YORR64',
-      you: 'player-host',
-      sessionToken: 'session-host-64',
+      you: 'player-creator',
+      sessionToken: 'session-creator-64',
     })
   })
 })

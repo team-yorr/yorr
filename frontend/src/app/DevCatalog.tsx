@@ -72,7 +72,7 @@ export function DevCatalog() {
       <section className={sectionClassName}>
         <h2 className="text-xl font-bold">Player and score</h2>
         <div className="grid gap-3 md:grid-cols-3">
-          <PlayerCard name="유진" isHost active />
+          <PlayerCard name="유진" active />
           <PlayerCard name="잠시 자리 비운 플레이어" score={64} status="away" />
           <PlayerCard name="요르" score={92} status="offline" />
         </div>

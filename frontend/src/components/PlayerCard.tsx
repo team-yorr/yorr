@@ -4,7 +4,6 @@ type PlayerCardProps = {
   name: string
   score?: number
   status?: 'online' | 'away' | 'offline'
-  isHost?: boolean
   active?: boolean
   className?: string
 }
@@ -17,12 +16,11 @@ const statusLabel = {
 export function PlayerCard({
   active = false,
   className,
-  isHost = false,
   name,
   score,
   status = 'online',
 }: PlayerCardProps) {
-  const stateLabel = `${isHost ? '방장, ' : ''}${statusLabel[status]}`
+  const stateLabel = statusLabel[status]
 
   return (
     <article

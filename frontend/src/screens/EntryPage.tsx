@@ -3,13 +3,13 @@ import styles from './EntryPage.module.css'
 =======
 import { useCreateRoom } from '@/api/useRoomApi'
 import { Button } from '@/components/Button'
->>>>>>> 96e7252d9d23d7d509ed4819e8180e49c884c7c8:frontend/src/screens/EntryPage.tsx
+import { generateNickname } from '@/nickname'
 
 export function EntryPage() {
   const createRoom = useCreateRoom()
 
   const handleStart = () => {
-    void createRoom.execute({ mode: 'party', gameType: 'yacht' })
+    void createRoom.execute({ mode: 'party', gameType: 'yacht', nickname: generateNickname() })
   }
 
   return (
