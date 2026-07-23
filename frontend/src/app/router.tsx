@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, Outlet } from '@tanstack/react-router'
 import { normalizeRoomCode } from '@/roomCode'
 import { EntryPage } from '@/screens/EntryPage'
+import { GamePage } from '@/screens/GamePage'
 import { LobbyPage } from '@/screens/LobbyPage'
 import { NicknamePage } from '@/screens/NicknamePage'
 import { DevCatalog } from './DevCatalog'
@@ -44,7 +45,19 @@ const lobbyRoute = createRoute({
   component: LobbyPage,
 })
 
-const routeTree = rootRoute.addChildren([indexRoute, joinRoute, lobbyRoute, devCatalogRoute])
+const gameRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/rooms/$roomId/game',
+  component: GamePage,
+})
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  joinRoute,
+  lobbyRoute,
+  gameRoute,
+  devCatalogRoute,
+])
 
 export const router = createRouter({ routeTree })
 
