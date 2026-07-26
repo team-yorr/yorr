@@ -205,7 +205,6 @@ pipeline {
                     docker build \
                         --tag "$BACKEND_IMAGE" \
                         --label "yorr.environment=$DEPLOY_ENV" \
-                        --label "yorr.commit=$GIT_COMMIT" \
                         backend
 
                     docker image inspect \
