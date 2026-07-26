@@ -24,14 +24,6 @@ export function EntryPage() {
   }
 
   return (
-<<<<<<< HEAD:frontend/src/features/entry/EntryPage.tsx
-    <main className={styles.page}>
-      <section className={styles.hero}>
-        <p className={styles.eyebrow}>REAL-TIME YACHT DICE</p>
-        <h1>YORR</h1>
-        <p>흔들거나 탭해서 함께 즐기는 모바일 요트다이스</p>
-        <button type="button">게임 시작</button>
-=======
     <main className="grid min-h-dvh place-items-center px-6 pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(1.5rem,env(safe-area-inset-bottom))]">
       <section className="grid w-full max-w-lg gap-5 text-center">
         <p className="m-0 text-xs font-bold tracking-[0.16em] text-brand-strong">

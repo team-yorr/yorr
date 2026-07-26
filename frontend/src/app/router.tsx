@@ -5,7 +5,6 @@ import { GamePage } from '@/screens/GamePage'
 import { LobbyPage } from '@/screens/LobbyPage'
 import { NicknamePage } from '@/screens/NicknamePage'
 import { DevCatalog } from './DevCatalog'
->>>>>>> 96e7252d9d23d7d509ed4819e8180e49c884c7c8
 
 const rootRoute = createRootRoute({
   component: () => <Outlet />,
@@ -18,9 +17,6 @@ const indexRoute = createRoute({
   component: EntryPage,
 })
 
-<<<<<<< HEAD
-const routeTree = rootRoute.addChildren([indexRoute])
-=======
 const devCatalogRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/__dev/components',

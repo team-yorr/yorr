@@ -1,7 +1,4 @@
 import { create } from 'zustand'
-<<<<<<< HEAD:frontend/src/app/store.ts
-import type { RoomSnapshot } from '../contracts/ws-events'
-=======
 import type { RoomSession } from '@/api/gameApi'
 import type { RoomSnapshot } from '@/realtime/wsEvents'
 import { clearRoomSession, readRoomSession, saveRoomSession } from '@/roomSessionStorage'
