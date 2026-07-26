@@ -58,23 +58,41 @@ class GameWebSocketHandlerTest {
         broadcaster.register("room-a", playerA);
         broadcaster.register("room-a", playerB);
 
-        handler.handle(playerA, submitMessage("player-a-message"));
+        handler.handle(playerA, submitMessage("room-a", "player-a-message"));
 
         verify(playerA, never()).sendMessage(org.mockito.ArgumentMatchers.any());
         verify(playerB, never()).sendMessage(org.mockito.ArgumentMatchers.any());
 
-        handler.handle(playerB, submitMessage("player-b-message"));
+        handler.handle(playerB, submitMessage("room-a", "player-b-message"));
 
         assertRoundEndWasSent(playerA);
         assertRoundEndWasSent(playerB);
     }
 
-    private TextMessage submitMessage(String msgId) throws Exception {
+    @Test
+    void rejectsSubmissionForRoomOtherThanSessionRoom() throws Exception {
+        roundSynchronizationService.initialize("room-a", 1, List.of("player-a"));
+        WebSocketSession session = sessionWithPlayer("player-a");
+        registry.join("room-b", session, "player-a", "Player A");
+        broadcaster.register("room-b", session);
+
+        handler.handle(session, submitMessage("room-a", "wrong-room-message"));
+
+        ArgumentCaptor<WebSocketMessage<?>> captor = ArgumentCaptor.forClass(WebSocketMessage.class);
+        verify(session).sendMessage(captor.capture());
+        String response = ((TextMessage) captor.getValue()).getPayload();
+
+        assertThat(response).contains("\"type\":\"error\"");
+        assertThat(response).contains("\"code\":\"NOT_IN_ROOM\"");
+        assertThat(response).contains("\"refMsgId\":\"wrong-room-message\"");
+    }
+
+    private TextMessage submitMessage(String roomId, String msgId) throws Exception {
         String message = objectMapper.writeValueAsString(new WsEnvelope<>(
                 "round.submit",
                 System.currentTimeMillis(),
                 new RoundSubmitPayload(1, List.of(1, 2, 3, 4, 5), "smallStraight"),
-                "room-a",
+                roomId,
                 msgId
         ));
         return new TextMessage(message);

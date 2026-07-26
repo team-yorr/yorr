@@ -296,6 +296,10 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             sendError(session, WsErrorCode.AUTH_REQUIRED, "인증된 플레이어 정보가 없습니다.", in.msgId());
             return;
         }
+        if (!roomId.equals(member.roomId())) {
+            sendError(session, WsErrorCode.NOT_IN_ROOM, "현재 세션이 참가한 방의 요청이 아닙니다.", in.msgId());
+            return;
+        }
         String playerId = member.playerId();
 
         RoundSubmitPayload payload;
