@@ -239,7 +239,7 @@ pipeline {
                     docker compose \
                         --project-name "$COMPOSE_PROJECT" \
                         --file deploy/compose.yaml \
-                        config
+                        config --quiet
 
                     docker compose \
                         --project-name "$COMPOSE_PROJECT" \
