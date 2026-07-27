@@ -5,9 +5,10 @@ import {
   Outlet,
   type RouterHistory,
 } from '@tanstack/react-router'
-import { normalizeRoomCode } from '@/roomCode'
+import { getRoomCodeError, normalizeRoomCode } from '@/roomCode'
 import { EntryPage } from '@/screens/EntryPage'
 import { GamePage } from '@/screens/GamePage'
+import { InvalidInvitePage } from '@/screens/InvalidInvitePage'
 import { LobbyPage } from '@/screens/LobbyPage'
 import { NicknamePage } from '@/screens/NicknamePage'
 import { DevCatalog } from './DevCatalog'
@@ -37,6 +38,9 @@ const joinRoute = createRoute({
   }),
   component: () => {
     const { code } = joinRoute.useSearch()
+    if (code !== undefined && getRoomCodeError(code)) {
+      return <InvalidInvitePage initialCode={code} />
+    }
     return <NicknamePage roomCode={code} />
   },
 })
@@ -44,13 +48,19 @@ const joinRoute = createRoute({
 const lobbyRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/rooms/$roomId/lobby',
-  component: LobbyPage,
+  component: () => {
+    const { roomId } = lobbyRoute.useParams()
+    return <LobbyPage roomId={roomId} />
+  },
 })
 
 const gameRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/rooms/$roomId/game',
-  component: GamePage,
+  component: () => {
+    const { roomId } = gameRoute.useParams()
+    return <GamePage roomId={roomId} />
+  },
 })
 
 const routeTree = rootRoute.addChildren([
