@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import { PHYSICS_DICE_CONFIG } from './config'
-import { closestQuaternionForTopValue, quaternionForTopValue, topFaceFromQuaternion } from './model'
+import { quaternionForTopValue, topFaceFromQuaternion } from './model'
 import type { AlignmentEntry, DieEntry, LayoutEntry } from './runtimeTypes'
 import type { PhysicsDiceIndex, PhysicsDiceSet, PhysicsHeldDice } from './types'
 
@@ -193,10 +193,7 @@ export function prepareAlignmentEntries(
       held: isHeld,
       slotIndex,
       targetPosition,
-      targetQuaternion: closestQuaternionForTopValue(
-        settledDice[entry.index],
-        entry.mesh.quaternion,
-      ),
+      targetQuaternion: quaternionForTopValue(settledDice[entry.index]),
       targetScale: isHeld ? keepSlotScale() : resultDieScale(),
       fromPosition: entry.mesh.position.clone(),
       fromQuaternion: entry.mesh.quaternion.clone(),
