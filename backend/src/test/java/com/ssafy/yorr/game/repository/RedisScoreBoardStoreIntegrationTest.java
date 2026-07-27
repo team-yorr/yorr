@@ -4,8 +4,16 @@ import com.ssafy.yorr.game.domain.ScoreBoard;
 import com.ssafy.yorr.game.dto.ScoreConfirmationCommand;
 import com.ssafy.yorr.game.dto.ScoreConfirmationResult;
 import com.ssafy.yorr.game.exception.ScoreConfirmationException;
+import com.ssafy.yorr.game.round.application.RoundSynchronizationService;
+import com.ssafy.yorr.game.round.application.ScoreRoundSubmissionResult;
+import com.ssafy.yorr.game.round.application.ScoreRoundSubmissionService;
+import com.ssafy.yorr.game.round.infrastructure.InMemoryRoundStateStore;
 import com.ssafy.yorr.game.service.ScoreConfirmationService;
 import com.ssafy.yorr.room.RoomRedisKeys;
+import com.ssafy.yorr.room.dto.RoomPhase;
+import com.ssafy.yorr.room.dto.RoomSnapshot;
+import com.ssafy.yorr.room.service.RoomService;
+import com.ssafy.yorr.ws.dto.RoundSubmitPayload;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -31,6 +39,8 @@ import static com.ssafy.yorr.game.exception.ScoreConfirmationException.Reason.GA
 import static com.ssafy.yorr.game.exception.ScoreConfirmationException.Reason.ROUND_ALREADY_SCORED;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 @Testcontainers
 class RedisScoreBoardStoreIntegrationTest {
@@ -199,6 +209,55 @@ class RedisScoreBoardStoreIntegrationTest {
                 .entries(RoomRedisKeys.gameScoreSubmissionsKey(staleGameId, PLAYER_ID))).isEmpty();
     }
 
+    @Test
+    void actualRedisFailureLeavesRoundSubmissionUncommitted() {
+        String staleGameId = "game-stale";
+        redisTemplate.opsForHash().put(RoomRedisKeys.gameKey(staleGameId), "roomCode", ROOM_CODE);
+        InMemoryRoundStateStore roundStore = new InMemoryRoundStateStore();
+        RoundSynchronizationService roundService = new RoundSynchronizationService(roundStore);
+        roundService.initialize(ROOM_CODE, 1, List.of(PLAYER_ID));
+        ScoreRoundSubmissionService coordinator =
+                scoreRoundSubmissionService(roundService, staleGameId);
+
+        assertReason(
+                () -> coordinator.submit(
+                        ROOM_CODE,
+                        PLAYER_ID,
+                        new RoundSubmitPayload(1, List.of(1, 2, 3, 4, 5), "choice")
+                ),
+                GAME_NOT_FOUND
+        );
+
+        assertThat(roundStore.findByRoomId(ROOM_CODE)).hasValueSatisfying(state -> {
+            assertThat(state.roundNumber()).isEqualTo(1);
+            assertThat(state.submittedPlayerIds()).isEmpty();
+        });
+        assertThat(roomTotal()).isEqualTo("0");
+    }
+
+    @Test
+    void actualRedisSuccessCommitsScoreBeforeCompletingRound() {
+        InMemoryRoundStateStore roundStore = new InMemoryRoundStateStore();
+        RoundSynchronizationService roundService = new RoundSynchronizationService(roundStore);
+        roundService.initialize(ROOM_CODE, 1, List.of(PLAYER_ID));
+        ScoreRoundSubmissionService coordinator =
+                scoreRoundSubmissionService(roundService, GAME_ID);
+
+        ScoreRoundSubmissionResult result = coordinator.submit(
+                ROOM_CODE,
+                PLAYER_ID,
+                new RoundSubmitPayload(1, List.of(1, 2, 3, 4, 5), "choice")
+        );
+
+        assertThat(result.score().scoreboard().total()).isEqualTo(15);
+        assertThat(result.round().roundCompleted()).isTrue();
+        assertThat(roomTotal()).isEqualTo("15");
+        assertThat(roundStore.findByRoomId(ROOM_CODE)).hasValueSatisfying(state -> {
+            assertThat(state.roundNumber()).isEqualTo(2);
+            assertThat(state.submittedPlayerIds()).isEmpty();
+        });
+    }
+
     private static ScoreConfirmationResult confirm(
             String gameId,
             int roundNumber,
@@ -230,6 +289,22 @@ class RedisScoreBoardStoreIntegrationTest {
         redisTemplate.opsForHash().put(RoomRedisKeys.roomKey(ROOM_CODE), "phase", "PLAYING");
         redisTemplate.opsForHash().put(RoomRedisKeys.playersKey(ROOM_CODE), PLAYER_ID, "player");
         redisTemplate.opsForHash().put(RoomRedisKeys.scoresKey(ROOM_CODE), PLAYER_ID, "0");
+    }
+
+    private static ScoreRoundSubmissionService scoreRoundSubmissionService(
+            RoundSynchronizationService roundService,
+            String gameId
+    ) {
+        RoomService roomService = mock(RoomService.class);
+        when(roomService.getSnapshot(ROOM_CODE)).thenReturn(new RoomSnapshot(
+                ROOM_CODE,
+                gameId,
+                PLAYER_ID,
+                RoomPhase.PLAYING,
+                1,
+                List.of()
+        ));
+        return new ScoreRoundSubmissionService(roundService, service, roomService);
     }
 
     private static String roomTotal() {
