@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react'
 import { cn } from '@/cn'
+import { useDialogBackground } from '@/useDialogBackground'
 
 type ModalProps = {
   open: boolean
@@ -17,17 +18,17 @@ export function Modal({ children, className, onClose, open, title }: ModalProps)
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
 
+  // 포커스 effect보다 먼저 선언한다 — cleanup 순서 때문이다(BottomSheet와 동일).
+  useDialogBackground(open)
+
   useEffect(() => {
     if (!open) return
     const previousFocus = document.activeElement as HTMLElement | null
     closeRef.current?.focus()
     const closeOnEscape = (event: KeyboardEvent) => event.key === 'Escape' && onCloseRef.current()
-    const previousBodyOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
     document.addEventListener('keydown', closeOnEscape)
     return () => {
       document.removeEventListener('keydown', closeOnEscape)
-      document.body.style.overflow = previousBodyOverflow
       previousFocus?.focus()
     }
   }, [open])

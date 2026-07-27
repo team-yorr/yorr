@@ -6,6 +6,7 @@ import {
   useState,
 } from 'react'
 import { cn } from '@/cn'
+import { useDialogBackground } from '@/useDialogBackground'
 
 interface BottomSheetProps {
   children: ReactNode
@@ -30,6 +31,10 @@ export function BottomSheet({ children, className, onClose, open, title }: Botto
   // 부모가 매 렌더 새 onClose를 넘겨도 포커스 트랩이 다시 잡히지 않도록 ref로 읽는다.
   const onCloseRef = useRef(onClose)
   onCloseRef.current = onClose
+
+  // 포커스 effect보다 먼저 선언한다 — cleanup이 먼저 돌아야 inert가 풀린 뒤
+  // 아래 effect가 뒤 화면의 원래 위치로 포커스를 되돌릴 수 있다.
+  useDialogBackground(open)
 
   useEffect(() => {
     if (!open) return
@@ -56,14 +61,9 @@ export function BottomSheet({ children, className, onClose, open, title }: Botto
       }
     }
 
-    // 시트가 열려 있는 동안 뒤 화면은 AT·스크롤 모두에서 잠근다.
-    const previousBodyOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = previousBodyOverflow
       previousFocus?.focus()
     }
   }, [open])
