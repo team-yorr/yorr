@@ -5,6 +5,7 @@ import { HttpResponse, http } from 'msw'
 import type { ReactNode } from 'react'
 import { vi } from 'vitest'
 import type { RoomSession } from '@/api/gameApi'
+import { InAppBrowserGate } from '@/app/InAppBrowserGate'
 import { RealtimeSync } from '@/app/RealtimeSync'
 import { createAppRouter } from '@/app/router'
 import { mockApiServer } from '@/mocks/server'
@@ -15,6 +16,7 @@ type ApiMethod = 'get' | 'post'
 type BrowserApiMode = 'success' | 'failure' | 'unsupported'
 
 export interface AppHarnessOptions {
+  browserApis?: BrowserApiOptions
   initialPath?: string
   realtimeClient?: FakeRealtimeClient
   session?: RoomSession | null
@@ -48,14 +50,18 @@ export function renderAppHarness(options: AppHarnessOptions = {}) {
   const router = createAppRouter(history)
   const realtimeClient = options.realtimeClient ?? new FakeRealtimeClient()
   const user = userEvent.setup()
+  const browserApis = options.browserApis ? installBrowserApiMocks(options.browserApis) : undefined
   const view = render(
-    <RealtimeSync client={realtimeClient}>
-      <RouterProvider router={router} />
-    </RealtimeSync>,
+    <InAppBrowserGate>
+      <RealtimeSync client={realtimeClient}>
+        <RouterProvider router={router} />
+      </RealtimeSync>
+    </InAppBrowserGate>,
   )
 
   return {
     ...view,
+    browserApis,
     history,
     realtimeClient,
     router,
