@@ -9,7 +9,7 @@ describe('physics dice face orientation', () => {
   })
 
   it.each([1, 2, 3, 4, 5, 6] as const)(
-    '%i 목표값에서 현재 자세와 가장 가까운 수평 회전을 선택한다',
+    '%i 눈을 유지하면서 현재 자세와 가장 가까운 수평 회전을 선택한다',
     (value) => {
       const current = new THREE.Quaternion()
         .setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 2)

@@ -4,7 +4,6 @@ import { disposeAppearance, syncAppearance } from './appearance'
 import { createBowl, createKeepSlots, createTray } from './arena'
 import { PHYSICS_DICE_CONFIG } from './config'
 import { createDiceInstances } from './diceInstances'
-import { areDiceAtTargets, type GuidanceStates, guideDiceToTargets, readTopDice } from './guidance'
 import { pickDie } from './interaction'
 import {
   keepSlotPosition,
@@ -22,6 +21,7 @@ import {
 import type { PhysicsDiceGeometries, PhysicsDiceMaterials } from './model'
 import { quaternionForTopValue } from './model'
 import { createPhysicsDiceRandom, type PhysicsDiceRandom } from './random'
+import { readTopDice } from './result'
 import type { AlignmentEntry, DieEntry, LayoutEntry } from './runtimeTypes'
 import { containDiceInBowl, containDiceInTray } from './safety'
 import { createStage } from './stage'
@@ -64,7 +64,6 @@ export class PhysicsDiceWorld {
   private floorMaterial!: THREE.MeshStandardMaterial
   private frameId: number | null = null
   private geometries!: PhysicsDiceGeometries
-  private guidanceStates: GuidanceStates = new Map()
   private held: PhysicsHeldDice = NO_HELD
   private heldOrder: PhysicsDiceIndex[] = []
   private keyLight!: THREE.DirectionalLight
@@ -146,7 +145,6 @@ export class PhysicsDiceWorld {
     this.request = request
     this.settledDice = null
     this.layoutAnimating = false
-    this.guidanceStates.clear()
     this.random = createPhysicsDiceRandom(request.seed)
     this.updateHeldOrder(request.held)
     this.held = [...request.held]
@@ -301,20 +299,6 @@ export class PhysicsDiceWorld {
     this.updateBowl(time)
     while (simulating && this.accumulator >= this.world.timestep) {
       this.world.step()
-      if (
-        this.phase === 'pouring' &&
-        this.diceReleased &&
-        this.request &&
-        time - this.rollStartedAt >= SCENE.guidance.startAfterMs
-      ) {
-        guideDiceToTargets(
-          this.entries,
-          this.held,
-          this.request.targetDice,
-          this.guidanceStates,
-          time - this.rollStartedAt,
-        )
-      }
       this.accumulator -= this.world.timestep
     }
     if (this.phase === 'shaking') containDiceInBowl(this.entries, this.held, this.bowlBody)
@@ -474,22 +458,19 @@ export class PhysicsDiceWorld {
 
   private checkSettled(time: number) {
     if (this.phase !== 'pouring' || !this.diceReleased || time - this.rollStartedAt < 900) return
-    const targetsAligned =
-      this.request && areDiceAtTargets(this.entries, this.held, this.request.targetDice)
-    const stable =
-      this.entries
-        .filter((entry) => !this.held[entry.index])
-        .every((entry) => {
-          const linear = entry.body.linvel()
-          const angular = entry.body.angvel()
-          return (
-            entry.body.isSleeping() ||
-            (Math.hypot(linear.x, linear.y, linear.z) < 0.13 &&
-              Math.hypot(angular.x, angular.y, angular.z) < 0.18)
-          )
-        }) && targetsAligned
+    const stable = this.entries
+      .filter((entry) => !this.held[entry.index])
+      .every((entry) => {
+        const linear = entry.body.linvel()
+        const angular = entry.body.angvel()
+        return (
+          entry.body.isSleeping() ||
+          (Math.hypot(linear.x, linear.y, linear.z) < 0.13 &&
+            Math.hypot(angular.x, angular.y, angular.z) < 0.18)
+        )
+      })
     this.stableFrames = stable ? this.stableFrames + 1 : 0
-    if (this.stableFrames < SCENE.guidance.stableFrames) return
+    if (this.stableFrames < SCENE.settlement.stableFrames) return
     this.startResultAlignment(time)
   }
 
@@ -500,7 +481,12 @@ export class PhysicsDiceWorld {
     this.alignmentStartedAt = time
     this.bowlExitStartedAt = time
     this.settledDice = readTopDice(this.entries)
-    this.alignmentEntries = prepareAlignmentEntries(this.entries, this.held, this.heldOrder)
+    this.alignmentEntries = prepareAlignmentEntries(
+      this.entries,
+      this.held,
+      this.heldOrder,
+      this.settledDice,
+    )
   }
 
   private updateResultAlignment(time: number) {
