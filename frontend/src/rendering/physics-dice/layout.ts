@@ -126,7 +126,10 @@ export function prepareLayoutEntries(
       ? keepSlotPosition(slotIndex)
       : new THREE.Vector3((row - (rolling.length - 1) / 2) * resultSpacing(), resultCenterY(), 0.55)
     const targetScale = isHeld ? keepSlotScale() : resultDieScale()
-    const targetQuaternion = quaternionForTopValue(committedDice[entry.index])
+    const targetQuaternion =
+      topFaceFromQuaternion(entry.mesh.quaternion) === committedDice[entry.index]
+        ? entry.mesh.quaternion.clone()
+        : quaternionForTopValue(committedDice[entry.index])
     entry.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
     entry.body.setTranslation(targetPosition, true)
     entry.body.setRotation(targetQuaternion, true)
