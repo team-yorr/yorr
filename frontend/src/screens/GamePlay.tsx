@@ -213,10 +213,118 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
     />
   )
 
-  if (wide) {
-    return (
-      <>
-        <main className="grid h-svh grid-cols-[360px_1fr] bg-canvas text-content">
+  // 넓은 화면에는 탭이 없다 — 점수표가 좌측 상시 패널로 항상 떠 있다.
+  const showDice = wide || tab === 'dice'
+
+  const keyboardHint = (
+    <p className="m-0 px-gutter text-center text-xs text-content-faint">
+      웹에는 센서가 없습니다 — 클릭으로 굴리고 Space·Enter·1~5 키도 씁니다
+    </p>
+  )
+
+  const recommendations = (
+    <section className="flex-none px-gutter">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 className="m-0 text-[11px] font-semibold text-content-muted">추천 족보</h2>
+        <button
+          className="-mr-1 min-h-tap cursor-pointer border-0 bg-transparent px-1 text-[11.5px] font-semibold text-content underline focus-visible:outline-3 focus-visible:outline-focus"
+          onClick={() => setSheetOpen(true)}
+          type="button"
+        >
+          전체 {YACHT_CATEGORIES.length}개 ▸
+        </button>
+      </div>
+      <ul className="grid list-none grid-cols-3 gap-2 p-0">
+        {recommended.length === 0 ? (
+          <li className="col-span-3 rounded-card border border-dashed border-border py-4 text-center text-[11.5px] text-content-faint">
+            주사위를 굴리면 추천 족보가 나타납니다
+          </li>
+        ) : (
+          recommended.map(([category, score], index) => (
+            <li key={category}>
+              <button
+                className={cn(
+                  'flex min-h-[3.625rem] w-full cursor-pointer flex-col items-center justify-center gap-px rounded-card bg-surface transition-colors focus-visible:outline-3 focus-visible:outline-focus focus-visible:outline-offset-2 disabled:cursor-not-allowed',
+                  local.selectedCategory === category
+                    ? 'border-2 border-brand'
+                    : 'border border-border',
+                )}
+                disabled={locked || submitted}
+                key={category}
+                onClick={() => {
+                  dispatch({ type: 'categorySelected', category })
+                  setSheetOpen(true)
+                }}
+                type="button"
+              >
+                <span className="text-[11px] font-semibold text-content">
+                  {categoryShortLabel[category]}
+                </span>
+                <span className="font-mono text-[18px] font-bold text-content tabular-nums">
+                  {score}
+                </span>
+                <span className="text-[9px] font-semibold text-content-faint">
+                  {index === 0 ? '최고 점수' : '사용 가능'}
+                </span>
+              </button>
+            </li>
+          ))
+        )}
+      </ul>
+    </section>
+  )
+
+  const actions = submitted ? (
+    waitingNotice
+  ) : wide ? (
+    <>
+      <Button
+        className="min-h-15 w-[300px] rounded-panel text-[17px]"
+        disabled={!canRoll}
+        loading={rolling}
+        onClick={handleRoll}
+        size="lg"
+      >
+        {rolling ? '굴리는 중' : '굴리기'}
+        {!rolling && <span className="ml-2 text-xs font-medium opacity-70">Space</span>}
+      </Button>
+      <Button
+        className="min-h-15 w-[220px] rounded-panel text-[15px]"
+        disabled={!canConfirm}
+        loading={submitScore.isLoading}
+        onClick={handleConfirm}
+        size="lg"
+        variant="secondary"
+      >
+        확정하기 <span className="ml-2 text-xs font-medium">Enter</span>
+      </Button>
+    </>
+  ) : (
+    <Button
+      className="min-h-15 flex-1 rounded-panel text-[17px]"
+      disabled={!(canRoll || canConfirm)}
+      loading={submitScore.isLoading || rolling}
+      onClick={canRoll ? handleRoll : handleConfirm}
+      size="lg"
+    >
+      {primaryLabel}
+    </Button>
+  )
+
+  return (
+    <>
+      {/*
+        레이아웃과 탭이 바뀌어도 트리 한 벌만 쓴다. 넓이별로 다른 트리를 반환하면
+        React가 위치가 같고 타입이 다른 노드를 갈아끼우면서 주사위 영역을 언마운트하고,
+        그때마다 rapier 물리 월드와 WebGL 컨텍스트가 통째로 재생성된다.
+      */}
+      <main
+        className={cn(
+          'h-svh bg-canvas text-content',
+          wide ? 'grid grid-cols-[360px_1fr]' : 'flex flex-col',
+        )}
+      >
+        {wide ? (
           <ScorePanel
             candidates={candidates}
             onSelect={(category) => dispatch({ type: 'categorySelected', category })}
@@ -229,183 +337,80 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
             viewedPlayerId={viewedPlayerId}
             you={session.you}
           />
+        ) : null}
 
-          <div className="flex min-h-0 flex-col">
-            <ConnectionBanner status={connectionStatus} />
-            {header}
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ConnectionBanner status={connectionStatus} />
+          {header}
+
+          {/* 점수표 탭에서도 감추기만 한다 — 언마운트하면 물리 월드를 다시 만든다. */}
+          <div className={cn('flex min-h-0 flex-1 flex-col', !showDice && 'hidden')}>
             <KeepTray
-              className="mx-gutter mt-4 flex-none"
+              className={cn('mx-gutter flex-none', wide ? 'mt-4' : 'mt-3')}
               dice={local.dice}
               held={local.held}
               locked={locked || local.rollCount >= MAX_ROLLS}
               onRelease={(index) => dispatch({ type: 'holdToggled', index })}
             />
             {diceScene}
-            <p className="m-0 px-gutter text-center text-xs text-content-faint">
-              웹에는 센서가 없습니다 — 클릭으로 굴리고 Space·Enter·1~5 키도 씁니다
-            </p>
-            <footer className="flex flex-none items-center gap-4 px-gutter py-5">
-              <RollCounter rollsUsed={local.rollCount} />
-              {submitted ? (
-                waitingNotice
-              ) : (
-                <>
-                  <Button
-                    className="min-h-15 w-[300px] rounded-panel text-[17px]"
-                    disabled={!canRoll}
-                    loading={rolling}
-                    onClick={handleRoll}
-                    size="lg"
-                  >
-                    {rolling ? '굴리는 중' : '굴리기'}
-                    {!rolling && <span className="ml-2 text-xs font-medium opacity-70">Space</span>}
-                  </Button>
-                  <Button
-                    className="min-h-15 w-[220px] rounded-panel text-[15px]"
-                    disabled={!canConfirm}
-                    loading={submitScore.isLoading}
-                    onClick={handleConfirm}
-                    size="lg"
-                    variant="secondary"
-                  >
-                    확정하기 <span className="ml-2 text-xs font-medium">Enter</span>
-                  </Button>
-                </>
+            {wide ? keyboardHint : recommendations}
+            <footer
+              className={cn(
+                'flex flex-none items-center px-gutter',
+                wide ? 'gap-4 py-5' : 'gap-3 pt-3',
               )}
+            >
+              <RollCounter rollsUsed={local.rollCount} />
+              {actions}
             </footer>
           </div>
-        </main>
-        <ToastHost message={toastMessage} />
-        {zeroModal}
-      </>
-    )
-  }
 
-  return (
-    <>
-      <main className="flex h-svh flex-col bg-canvas text-content">
-        <ConnectionBanner status={connectionStatus} />
-        {header}
-
-        {tab === 'dice' ? (
-          <>
-            <KeepTray
-              className="mx-gutter mt-3 flex-none"
-              dice={local.dice}
-              held={local.held}
-              locked={locked || local.rollCount >= MAX_ROLLS}
-              onRelease={(index) => dispatch({ type: 'holdToggled', index })}
+          {!wide && tab === 'scores' ? (
+            <ScoreMatrix
+              className="min-h-0 flex-1"
+              players={toMatrixPlayers(snapshot.players, game?.scores, session.you)}
             />
-            {diceScene}
+          ) : null}
 
-            <section className="flex-none px-gutter">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <h2 className="m-0 text-[11px] font-semibold text-content-muted">추천 족보</h2>
+          {wide ? null : (
+            <nav
+              aria-label="게임 화면 전환"
+              className="mt-3 flex flex-none border-t border-border pb-[env(safe-area-inset-bottom)]"
+            >
+              {(['dice', 'scores'] as const).map((value) => (
                 <button
-                  className="-mr-1 min-h-tap cursor-pointer border-0 bg-transparent px-1 text-[11.5px] font-semibold text-content underline focus-visible:outline-3 focus-visible:outline-focus"
-                  onClick={() => setSheetOpen(true)}
+                  aria-current={tab === value}
+                  className={cn(
+                    'min-h-14 flex-1 cursor-pointer border-0 bg-transparent text-[13px] focus-visible:outline-3 focus-visible:outline-focus focus-visible:outline-offset-[-3px]',
+                    tab === value
+                      ? 'border-b-[3px] border-brand font-bold text-content'
+                      : 'font-semibold text-content-muted',
+                  )}
+                  key={value}
+                  onClick={() => setTab(value)}
                   type="button"
                 >
-                  전체 {YACHT_CATEGORIES.length}개 ▸
+                  {value === 'dice' ? '주사위' : '점수표'}
                 </button>
-              </div>
-              <ul className="grid list-none grid-cols-3 gap-2 p-0">
-                {recommended.length === 0 ? (
-                  <li className="col-span-3 rounded-card border border-dashed border-border py-4 text-center text-[11.5px] text-content-faint">
-                    주사위를 굴리면 추천 족보가 나타납니다
-                  </li>
-                ) : (
-                  recommended.map(([category, score], index) => (
-                    <li key={category}>
-                      <button
-                        className={cn(
-                          'flex min-h-[3.625rem] w-full cursor-pointer flex-col items-center justify-center gap-px rounded-card bg-surface transition-colors focus-visible:outline-3 focus-visible:outline-focus focus-visible:outline-offset-2 disabled:cursor-not-allowed',
-                          local.selectedCategory === category
-                            ? 'border-2 border-brand'
-                            : 'border border-border',
-                        )}
-                        disabled={locked || submitted}
-                        key={category}
-                        onClick={() => {
-                          dispatch({ type: 'categorySelected', category })
-                          setSheetOpen(true)
-                        }}
-                        type="button"
-                      >
-                        <span className="text-[11px] font-semibold text-content">
-                          {categoryShortLabel[category]}
-                        </span>
-                        <span className="font-mono text-[18px] font-bold text-content tabular-nums">
-                          {score}
-                        </span>
-                        <span className="text-[9px] font-semibold text-content-faint">
-                          {index === 0 ? '최고 점수' : '사용 가능'}
-                        </span>
-                      </button>
-                    </li>
-                  ))
-                )}
-              </ul>
-            </section>
-
-            <div className="flex flex-none items-center gap-3 px-gutter pt-3">
-              <RollCounter rollsUsed={local.rollCount} />
-              {submitted ? (
-                waitingNotice
-              ) : (
-                <Button
-                  className="min-h-15 flex-1 rounded-panel text-[17px]"
-                  disabled={!(canRoll || canConfirm)}
-                  loading={submitScore.isLoading || rolling}
-                  onClick={canRoll ? handleRoll : handleConfirm}
-                  size="lg"
-                >
-                  {primaryLabel}
-                </Button>
-              )}
-            </div>
-          </>
-        ) : (
-          <ScoreMatrix
-            className="min-h-0 flex-1"
-            players={toMatrixPlayers(snapshot.players, game?.scores, session.you)}
-          />
-        )}
-
-        <nav
-          aria-label="게임 화면 전환"
-          className="mt-3 flex flex-none border-t border-border pb-[env(safe-area-inset-bottom)]"
-        >
-          {(['dice', 'scores'] as const).map((value) => (
-            <button
-              aria-current={tab === value}
-              className={cn(
-                'min-h-14 flex-1 cursor-pointer border-0 bg-transparent text-[13px] focus-visible:outline-3 focus-visible:outline-focus focus-visible:outline-offset-[-3px]',
-                tab === value
-                  ? 'border-b-[3px] border-brand font-bold text-content'
-                  : 'font-semibold text-content-muted',
-              )}
-              key={value}
-              onClick={() => setTab(value)}
-              type="button"
-            >
-              {value === 'dice' ? '주사위' : '점수표'}
-            </button>
-          ))}
-        </nav>
+              ))}
+            </nav>
+          )}
+        </div>
       </main>
 
-      <BottomSheet onClose={() => setSheetOpen(false)} open={sheetOpen} title="족보 선택">
-        <CategorySheet
-          candidates={candidates}
-          onConfirm={handleConfirm}
-          onSelect={(category) => dispatch({ type: 'categorySelected', category })}
-          recorded={myBoard?.categories ?? {}}
-          selectedCategory={local.selectedCategory}
-          submitting={submitScore.isLoading}
-          total={myBoard?.total ?? 0}
-        />
-      </BottomSheet>
+      {wide ? null : (
+        <BottomSheet onClose={() => setSheetOpen(false)} open={sheetOpen} title="족보 선택">
+          <CategorySheet
+            candidates={candidates}
+            onConfirm={handleConfirm}
+            onSelect={(category) => dispatch({ type: 'categorySelected', category })}
+            recorded={myBoard?.categories ?? {}}
+            selectedCategory={local.selectedCategory}
+            submitting={submitScore.isLoading}
+            total={myBoard?.total ?? 0}
+          />
+        </BottomSheet>
+      )}
 
       <ToastHost message={toastMessage} />
       {zeroModal}
