@@ -1,4 +1,10 @@
-import { createRootRoute, createRoute, createRouter, Outlet } from '@tanstack/react-router'
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  Outlet,
+  type RouterHistory,
+} from '@tanstack/react-router'
 import { normalizeRoomCode } from '@/roomCode'
 import { EntryPage } from '@/screens/EntryPage'
 import { GamePage } from '@/screens/GamePage'
@@ -55,7 +61,14 @@ const routeTree = rootRoute.addChildren([
   devCatalogRoute,
 ])
 
-export const router = createRouter({ routeTree })
+export function createAppRouter(history?: RouterHistory) {
+  return createRouter({
+    routeTree,
+    ...(history ? { history } : {}),
+  })
+}
+
+export const router = createAppRouter()
 
 declare module '@tanstack/react-router' {
   interface Register {
