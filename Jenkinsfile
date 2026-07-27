@@ -63,9 +63,7 @@ pipeline {
                             'vercel-prod-project-id'
                         env.FRONTEND_ENV_CREDENTIAL =
                             'frontend-main'
-                    } else if (env.BRANCH_NAME == 'develop' ||
-                                                               env.BRANCH_NAME ==
-                                                                   'docs/S15P11A406-32-repo-branch-strategy-ci-setting') {
+                    } else if (env.BRANCH_NAME == 'develop') {
                         env.DEPLOY_ENV = 'dev'
                         env.BACKEND_IMAGE = 'backend:dev'
                         env.BACKEND_CONTAINER =
