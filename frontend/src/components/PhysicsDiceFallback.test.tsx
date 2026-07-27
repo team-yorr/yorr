@@ -38,7 +38,7 @@ describe('PhysicsDiceFallback', () => {
 
     act(() => frameCallbacks[0]?.(0))
     expect(onRollComplete).toHaveBeenCalledOnce()
-    expect(onRollComplete).toHaveBeenCalledWith('roll-73')
+    expect(onRollComplete).toHaveBeenCalledWith('roll-73', request.targetDice)
 
     vi.restoreAllMocks()
   })
