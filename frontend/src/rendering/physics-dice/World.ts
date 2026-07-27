@@ -492,14 +492,13 @@ export class PhysicsDiceWorld {
   private updateResultAlignment(time: number) {
     const progress = Math.min(1, (time - this.alignmentStartedAt) / SCENE.alignment.durationMs)
     const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
-    const lift = Math.sin(progress * Math.PI) * SCENE.alignment.lift
     this.cameraHorizontal = THREE.MathUtils.lerp(
       SCENE.camera.simulationHalfWidth,
       resultCameraWidth(),
       eased,
     )
     this.resize()
-    updateAlignmentEntries(this.alignmentEntries, progress, lift)
+    updateAlignmentEntries(this.alignmentEntries, progress)
     this.updateBowlExit(time)
     if (progress < 1 || !this.request) return
     const completed = this.request

@@ -202,21 +202,37 @@ export function prepareAlignmentEntries(
   })
 }
 
-export function updateAlignmentEntries(entries: AlignmentEntry[], progress: number, lift: number) {
-  const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
+export function updateAlignmentEntries(entries: AlignmentEntry[], progress: number) {
+  const lineUpProgress = Math.min(1, progress / SCENE.alignment.lineUpEnd)
+  const scaleProgress = Math.max(
+    0,
+    Math.min(1, (progress - SCENE.alignment.scaleStart) / (1 - SCENE.alignment.scaleStart)),
+  )
+  const lineUpEased = easeInOut(lineUpProgress)
+  const scaleEased = easeInOut(scaleProgress)
+  const lift = Math.sin(lineUpProgress * Math.PI) * SCENE.alignment.lift
+
   entries.forEach((item) => {
-    item.entry.mesh.position.lerpVectors(item.fromPosition, item.targetPosition, eased)
+    item.entry.mesh.position.lerpVectors(item.fromPosition, item.targetPosition, lineUpEased)
     if (!item.held) item.entry.mesh.position.y += lift
-    item.entry.mesh.quaternion.slerpQuaternions(item.fromQuaternion, item.targetQuaternion, eased)
+    item.entry.mesh.quaternion.slerpQuaternions(
+      item.fromQuaternion,
+      item.targetQuaternion,
+      lineUpEased,
+    )
     const scale =
-      THREE.MathUtils.lerp(item.fromScale, item.targetScale, eased) +
-      (item.held ? 0 : Math.sin(progress * Math.PI) * SCENE.alignment.scaleOvershoot)
+      THREE.MathUtils.lerp(item.fromScale, item.targetScale, scaleEased) +
+      (item.held ? 0 : Math.sin(scaleProgress * Math.PI) * SCENE.alignment.scaleOvershoot)
     item.entry.mesh.scale.setScalar(scale)
-    item.entry.outline.visible = item.held || progress > 0.55
+    item.entry.outline.visible = item.held || scaleProgress > 0.3
     item.entry.outline.position.set(item.targetPosition.x, 0.04, item.targetPosition.z)
     item.entry.outline.scale.set(item.targetScale, item.targetScale, 1)
     item.entry.outline.material.opacity = item.held
       ? 0.92
-      : Math.max(0, 0.12 * ((progress - 0.55) / 0.45))
+      : Math.max(0, 0.12 * ((scaleProgress - 0.3) / 0.7))
   })
+}
+
+function easeInOut(progress: number) {
+  return progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
 }
