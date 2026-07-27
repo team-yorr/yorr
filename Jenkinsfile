@@ -61,6 +61,8 @@ pipeline {
                             'yorr-main'
                         env.VERCEL_PROJECT_CREDENTIAL =
                             'vercel-prod-project-id'
+                        env.FRONTEND_ENV_CREDENTIAL =
+                            'frontend-main'
                     } else if (env.BRANCH_NAME == 'develop' ||
                                                                env.BRANCH_NAME ==
                                                                    'docs/S15P11A406-32-repo-branch-strategy-ci-setting') {
@@ -78,6 +80,8 @@ pipeline {
                             'yorr-dev'
                         env.VERCEL_PROJECT_CREDENTIAL =
                             'vercel-dev-project-id'
+                        env.FRONTEND_ENV_CREDENTIAL =
+                            'frontend-dev'
                     } else {
                         error(
                             "배포 대상이 아닌 브랜치입니다: " +
@@ -362,6 +366,11 @@ pipeline {
             steps {
                 script {
                     withCredentials([
+                        file(
+                            credentialsId:
+                                env.FRONTEND_ENV_CREDENTIAL,
+                            variable: 'FRONTEND_ENV_FILE'
+                        ),
                         string(
                             credentialsId: 'vercel-token',
                             variable: 'VERCEL_TOKEN'
@@ -380,6 +389,27 @@ pipeline {
                             sh '''
                                 set +x
                                 set -eu
+
+                                test -f "$FRONTEND_ENV_FILE" || {
+                                    echo "Frontend environment file is missing"
+                                    exit 1
+                                }
+
+                                set -a
+                                . "$FRONTEND_ENV_FILE"
+                                set +a
+
+                                test -n "${VITE_API_BASE_URL:-}" || {
+                                    echo "VITE_API_BASE_URL is missing"
+                                    exit 1
+                                }
+
+                                test -n "${VITE_WS_URL:-}" || {
+                                    echo "VITE_WS_URL is missing"
+                                    exit 1
+                                }
+
+                                echo "Frontend environment variables loaded"
 
                                 npx --yes vercel@latest pull \
                                     --yes \
