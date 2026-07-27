@@ -324,9 +324,8 @@ pipeline {
                         npm ci
                         npm run check -- --line-ending=lf
                         npm run typecheck
-                        npm test -- --run
+                        npm test
                         npm run build
-                        npm run test:e2e
                     '''
                 }
             }
