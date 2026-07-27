@@ -21,7 +21,7 @@ export function RealtimeSync({ children, client }: RealtimeSyncProps) {
     }
 
     let active = true
-    let reconnecting = false
+    let hasConnected = false
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined
     let heartbeatTimer: ReturnType<typeof setInterval> | undefined
 
@@ -52,11 +52,11 @@ export function RealtimeSync({ children, client }: RealtimeSyncProps) {
       if (event === 'open') {
         useAppStore.getState().setConnectionStatus('connected')
         client.send(
-          reconnecting
+          hasConnected
             ? buildClientMessage('sys.reconnect', { sessionToken })
             : buildClientMessage('room.join', { sessionToken }),
         )
-        reconnecting = true
+        hasConnected = true
         return
       }
 

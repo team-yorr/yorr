@@ -21,7 +21,7 @@ describe('LobbyPage', () => {
   })
 
   it('shows every participant and marks the current player', () => {
-    render(<LobbyPage />)
+    render(<LobbyPage roomId={creatorSession.roomId} />)
 
     expect(screen.getByRole('region', { name: '참가자 2명' })).toBeVisible()
     expect(screen.getByText('느긋한 주사위')).toBeVisible()
@@ -31,7 +31,7 @@ describe('LobbyPage', () => {
 
   it('lets any participant start once two players are present', async () => {
     const user = userEvent.setup()
-    render(<LobbyPage />)
+    render(<LobbyPage roomId={creatorSession.roomId} />)
 
     await user.click(screen.getByRole('button', { name: '게임 시작' }))
 
@@ -52,7 +52,7 @@ describe('LobbyPage', () => {
       value: { writeText },
     })
 
-    render(<LobbyPage />)
+    render(<LobbyPage roomId={creatorSession.roomId} />)
     await user.click(screen.getByRole('button', { name: '링크 복사' }))
 
     expect(writeText).toHaveBeenCalledWith(
@@ -62,7 +62,7 @@ describe('LobbyPage', () => {
   })
 
   it('moves once when realtime changes the room phase', async () => {
-    render(<LobbyPage />)
+    render(<LobbyPage roomId={creatorSession.roomId} />)
 
     useAppStore.getState().replaceRoomSnapshot({
       ...creatorSession.snapshot,

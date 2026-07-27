@@ -2,11 +2,11 @@ import { useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { useAppStore } from '@/store'
 
-export function GamePage({ roomId }: { roomId?: string } = {}) {
+export function GamePage({ roomId }: { roomId: string }) {
   const navigate = useNavigate()
   const roomSession = useAppStore((state) => state.roomSession)
   const roomSnapshot = useAppStore((state) => state.roomSnapshot)
-  const matchingRoom = !roomId || roomSession?.roomId === roomId
+  const matchingRoom = roomSession?.roomId === roomId
 
   useEffect(() => {
     if (!roomSession || !roomSnapshot || !matchingRoom) {

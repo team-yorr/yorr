@@ -71,7 +71,7 @@ describe('QR entrance integration', () => {
 
   it('copies and shares the canonical invitation from the lobby', async () => {
     const { browserApis, user } = renderAppHarness({
-      browserApis: {},
+      browserApis: true,
       initialPath: `/rooms/${creatorSession.roomId}/lobby`,
       session: creatorSession,
     })

@@ -7,16 +7,16 @@ import { PlayerCard } from '@/components/PlayerCard'
 import { useAppStore } from '@/store'
 
 interface LobbyPageProps {
-  roomId?: string
+  roomId: string
 }
 
-export function LobbyPage({ roomId }: LobbyPageProps = {}) {
+export function LobbyPage({ roomId }: LobbyPageProps) {
   const navigate = useNavigate()
   const roomSession = useAppStore((state) => state.roomSession)
   const roomSnapshot = useAppStore((state) => state.roomSnapshot)
   const connectionStatus = useAppStore((state) => state.connectionStatus)
   const startGame = useStartGame()
-  const matchingRoom = !roomId || roomSession?.roomId === roomId
+  const matchingRoom = roomSession?.roomId === roomId
   const canStart =
     matchingRoom &&
     connectionStatus === 'connected' &&

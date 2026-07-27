@@ -1,5 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react'
-import { Component, type ErrorInfo, type ReactNode, useMemo, useState } from 'react'
+import { Component, type ErrorInfo, type ReactNode, useState } from 'react'
 import { Button } from './Button'
 
 interface InvitationPanelProps {
@@ -7,7 +7,7 @@ interface InvitationPanelProps {
 }
 
 export function InvitationPanel({ roomCode }: InvitationPanelProps) {
-  const inviteUrl = useMemo(() => createInviteUrl(roomCode), [roomCode])
+  const inviteUrl = createInviteUrl(roomCode)
   const [copyMessage, setCopyMessage] = useState<string | null>(null)
   const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
 

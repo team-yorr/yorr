@@ -95,12 +95,7 @@ export function NicknamePage({ roomCode }: NicknamePageProps) {
                   variant="secondary"
                   onClick={() => void navigate({ to: '/' })}
                 >
-                  다른 코드 입력
-                </Button>
-              )}
-              {!roomCode && userError.canChangeRoom && (
-                <Button type="button" variant="ghost" onClick={() => void navigate({ to: '/' })}>
-                  홈으로
+                  {roomCode ? '다른 코드 입력' : '홈으로'}
                 </Button>
               )}
             </div>
