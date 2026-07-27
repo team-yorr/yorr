@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getRoomCodeError, normalizeRoomCode } from './roomCode'
+import {
+  getRoomCodeError,
+  isCompleteRoomCode,
+  normalizeRoomCode,
+  sanitizeRoomCodeInput,
+} from './roomCode'
 
 describe('room code rules', () => {
   it('normalizes a room code from text input or query string', () => {
@@ -10,5 +15,20 @@ describe('room code rules', () => {
     expect(getRoomCodeError('YORR64')).toBeNull()
     expect(getRoomCodeError('요르64')).toBe('초대 코드는 영문과 숫자 4~12자로 입력해 주세요.')
     expect(getRoomCodeError('ABC')).toBe('초대 코드는 영문과 숫자 4~12자로 입력해 주세요.')
+  })
+
+  it('strips anything a room code cannot contain while typing or pasting', () => {
+    expect(sanitizeRoomCodeInput('yo!r-r 64')).toBe('YORR64')
+    expect(sanitizeRoomCodeInput('요르abc')).toBe('ABC')
+  })
+
+  it('caps the input at the maximum code length', () => {
+    expect(sanitizeRoomCodeInput('ABCDEFGHIJKLMNOP')).toBe('ABCDEFGHIJKL')
+  })
+
+  it('enables joining only once the code is long enough', () => {
+    expect(isCompleteRoomCode('ABC')).toBe(false)
+    expect(isCompleteRoomCode('ABCD')).toBe(true)
+    expect(isCompleteRoomCode('YORR64')).toBe(true)
   })
 })
