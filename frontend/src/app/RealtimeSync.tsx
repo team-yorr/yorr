@@ -131,6 +131,17 @@ function applyServerMessage(message: ServerMessage, startHeartbeat: (intervalMs:
       return
     case 'room.closed':
       store.reset()
+      useAppStore.getState().setAppNotice('방이 종료되어 홈으로 이동했어요.')
+      return
+    case 'error':
+      if (
+        message.payload.code === 'SESSION_EXPIRED' ||
+        message.payload.code === 'AUTH_FAILED' ||
+        message.payload.code === 'AUTH_REQUIRED'
+      ) {
+        store.reset()
+        useAppStore.getState().setAppNotice('입장 정보가 만료됐어요. 방에 다시 참가해 주세요.')
+      }
       return
     default:
       return
