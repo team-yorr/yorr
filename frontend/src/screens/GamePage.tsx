@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react'
+import { useGame } from '@/api/useGameApi'
 import { Button } from '@/components/Button'
 import { MotionPermissionPanel } from '@/components/MotionPermissionPanel'
 import { PhysicsDiceScene } from '@/components/PhysicsDiceScene'
