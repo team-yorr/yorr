@@ -110,6 +110,17 @@ export const PHYSICS_DICE_CONFIG = {
       },
     },
     alignment: { durationMs: 900, lift: 0.52, scaleOvershoot: 0.06 },
+    guidance: {
+      startAfterMs: 1050,
+      orientationLockAfterMs: 2850,
+      strength: 0.018,
+      damping: 0.006,
+      maxTorqueImpulse: 0.028,
+      rotationStep: 0.085,
+      landingStep: 0.12,
+      angleTolerance: 0.07,
+      stableFrames: 14,
+    },
     safety: { margin: 0.16, bounce: 0.52 },
   },
 } as const

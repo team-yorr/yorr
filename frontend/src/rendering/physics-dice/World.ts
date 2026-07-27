@@ -4,6 +4,7 @@ import { disposeAppearance, syncAppearance } from './appearance'
 import { createBowl, createKeepSlots, createTray } from './arena'
 import { PHYSICS_DICE_CONFIG } from './config'
 import { createDiceInstances } from './diceInstances'
+import { areDiceAtTargets, type GuidanceTargets, guideDiceToTargets } from './guidance'
 import { pickDie } from './interaction'
 import {
   keepSlotPosition,
@@ -63,6 +64,7 @@ export class PhysicsDiceWorld {
   private floorMaterial!: THREE.MeshStandardMaterial
   private frameId: number | null = null
   private geometries!: PhysicsDiceGeometries
+  private guidanceTargets: GuidanceTargets = new Map()
   private held: PhysicsHeldDice = NO_HELD
   private heldOrder: PhysicsDiceIndex[] = []
   private keyLight!: THREE.DirectionalLight
@@ -142,6 +144,7 @@ export class PhysicsDiceWorld {
       return
     this.request = request
     this.layoutAnimating = false
+    this.guidanceTargets.clear()
     this.random = createPhysicsDiceRandom(request.seed)
     this.updateHeldOrder(request.held)
     this.held = [...request.held]
@@ -296,6 +299,20 @@ export class PhysicsDiceWorld {
     this.updateBowl(time)
     while (simulating && this.accumulator >= this.world.timestep) {
       this.world.step()
+      if (
+        this.phase === 'pouring' &&
+        this.diceReleased &&
+        this.request &&
+        time - this.rollStartedAt >= SCENE.guidance.startAfterMs
+      ) {
+        guideDiceToTargets(
+          this.entries,
+          this.held,
+          this.request.targetDice,
+          this.guidanceTargets,
+          time - this.rollStartedAt,
+        )
+      }
       this.accumulator -= this.world.timestep
     }
     if (this.phase === 'shaking') containDiceInBowl(this.entries, this.held, this.bowlBody)
@@ -455,19 +472,21 @@ export class PhysicsDiceWorld {
 
   private checkSettled(time: number) {
     if (this.phase !== 'pouring' || !this.diceReleased || time - this.rollStartedAt < 900) return
-    const stable = this.entries
-      .filter((entry) => !this.held[entry.index])
-      .every((entry) => {
-        const linear = entry.body.linvel()
-        const angular = entry.body.angvel()
-        return (
-          entry.body.isSleeping() ||
-          (Math.hypot(linear.x, linear.y, linear.z) < 0.13 &&
-            Math.hypot(angular.x, angular.y, angular.z) < 0.18)
-        )
-      })
+    const targetsAligned = areDiceAtTargets(this.entries, this.held, this.guidanceTargets)
+    const stable =
+      this.entries
+        .filter((entry) => !this.held[entry.index])
+        .every((entry) => {
+          const linear = entry.body.linvel()
+          const angular = entry.body.angvel()
+          return (
+            entry.body.isSleeping() ||
+            (Math.hypot(linear.x, linear.y, linear.z) < 0.13 &&
+              Math.hypot(angular.x, angular.y, angular.z) < 0.18)
+          )
+        }) && targetsAligned
     this.stableFrames = stable ? this.stableFrames + 1 : 0
-    if (this.stableFrames < 20 && time - this.rollStartedAt < 4800) return
+    if (this.stableFrames < SCENE.guidance.stableFrames) return
     this.startResultAlignment(time)
   }
 
