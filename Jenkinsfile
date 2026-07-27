@@ -322,9 +322,9 @@ pipeline {
                         set -eu
 
                         npm ci
-                        npm run check
+                        npm run check -- --line-ending=lf
                         npm run typecheck
-                        npm test
+                        npm test -- --run
                         npm run build
                         npm run test:e2e
                     '''
