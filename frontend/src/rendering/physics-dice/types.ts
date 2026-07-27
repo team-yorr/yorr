@@ -25,7 +25,7 @@ export interface PhysicsDiceWorldCallbacks {
   onHeldToggle(index: PhysicsDiceIndex): void
   onPhaseChange(phase: PhysicsDicePhase): void
   onResizeChange(resizing: boolean): void
-  onRollComplete(requestId: string): void
+  onRollComplete(requestId: string, dice: PhysicsDiceSet): void
 }
 
 export interface PhysicsDiceWorldOptions {

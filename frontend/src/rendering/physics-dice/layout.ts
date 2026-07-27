@@ -1,7 +1,7 @@
 import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import { PHYSICS_DICE_CONFIG } from './config'
-import { closestQuaternionForTopValue, quaternionForTopValue } from './model'
+import { quaternionForTopValue, topFaceFromQuaternion } from './model'
 import type { AlignmentEntry, DieEntry, LayoutEntry } from './runtimeTypes'
 import type { PhysicsDiceIndex, PhysicsDiceSet, PhysicsHeldDice } from './types'
 
@@ -92,9 +92,13 @@ export function lineUpDice(
           0.55,
         )
     const scale = isHeld ? keepSlotScale() : resultDieScale()
+    const targetQuaternion =
+      topFaceFromQuaternion(entry.mesh.quaternion) === committedDice[entry.index]
+        ? entry.mesh.quaternion
+        : quaternionForTopValue(committedDice[entry.index])
     entry.mesh.visible = true
     entry.mesh.position.copy(position)
-    entry.mesh.quaternion.copy(quaternionForTopValue(committedDice[entry.index]))
+    entry.mesh.quaternion.copy(targetQuaternion)
     entry.mesh.scale.setScalar(scale)
     entry.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
     entry.body.setTranslation(position, true)
@@ -169,7 +173,6 @@ export function prepareAlignmentEntries(
   entries: DieEntry[],
   held: PhysicsHeldDice,
   heldOrder: PhysicsDiceIndex[],
-  targetDice: PhysicsDiceSet,
 ): AlignmentEntry[] {
   const rolling = entries.filter((entry) => !held[entry.index])
   const heldSlots = new Map(heldOrder.map((index, slot) => [index, slot]))
@@ -186,10 +189,7 @@ export function prepareAlignmentEntries(
       held: isHeld,
       slotIndex,
       targetPosition,
-      targetQuaternion: closestQuaternionForTopValue(
-        targetDice[entry.index],
-        entry.mesh.quaternion,
-      ),
+      targetQuaternion: entry.mesh.quaternion.clone(),
       targetScale: isHeld ? keepSlotScale() : resultDieScale(),
       fromPosition: entry.mesh.position.clone(),
       fromQuaternion: entry.mesh.quaternion.clone(),

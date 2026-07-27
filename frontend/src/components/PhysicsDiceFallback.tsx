@@ -12,7 +12,7 @@ type PhysicsDiceFallbackProps = {
   held: PhysicsHeldDice
   message?: string
   onHeldToggle?: (index: PhysicsDiceIndex) => void
-  onRollComplete: (requestId: string) => void
+  onRollComplete: (requestId: string, dice: PhysicsDiceSet) => void
   request: PhysicsDiceRollRequest | null
 }
 
@@ -33,7 +33,7 @@ export function PhysicsDiceFallback({
   useEffect(() => {
     if (!request || completedRef.current.has(request.requestId)) return
     completedRef.current.add(request.requestId)
-    const frame = requestAnimationFrame(() => onRollComplete(request.requestId))
+    const frame = requestAnimationFrame(() => onRollComplete(request.requestId, request.targetDice))
     return () => cancelAnimationFrame(frame)
   }, [onRollComplete, request])
 

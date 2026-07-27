@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { describe, expect, it } from 'vitest'
-import { quaternionError, stepQuaternionTowardTarget } from './guidance'
+import { quaternionError } from './guidance'
 
 describe('physics dice target guidance', () => {
   it('동일한 자세의 회전 오차는 0이다', () => {
@@ -23,14 +23,5 @@ describe('physics dice target guidance', () => {
 
     expect(error.angle).toBeCloseTo(Math.PI / 2, 6)
     expect(error.axis.x).toBeCloseTo(1, 6)
-  })
-
-  it('감속 구간에서 목표 자세를 향해 점진적으로 회전한다', () => {
-    const current = new THREE.Quaternion()
-    const target = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI)
-    const next = stepQuaternionTowardTarget(current, target, 0.1)
-
-    expect(quaternionError(next, target).angle).toBeLessThan(quaternionError(current, target).angle)
-    expect(quaternionError(current, next).angle).toBeCloseTo(Math.PI * 0.1, 6)
   })
 })

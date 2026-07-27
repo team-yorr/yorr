@@ -38,10 +38,10 @@ export function PhysicsDiceDemo() {
     setRequest(plan)
   }
 
-  const complete = (requestId: string) => {
+  const complete = (requestId: string, completedDice: DiceSet) => {
     setRequest((current) => {
       if (!current || current.requestId !== requestId) return current
-      setDice(current.targetDice)
+      setDice(completedDice)
       seedRef.current = nextSeedRef.current
       return null
     })

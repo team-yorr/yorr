@@ -1,96 +1,94 @@
-import RAPIER from '@dimforge/rapier3d-compat'
 import * as THREE from 'three'
 import { PHYSICS_DICE_CONFIG } from './config'
-import { closestQuaternionForTopValue } from './model'
+import { closestQuaternionForTopValue, topFaceFromQuaternion } from './model'
 import type { DieEntry } from './runtimeTypes'
 import type { PhysicsDiceIndex, PhysicsDiceSet, PhysicsHeldDice } from './types'
 
 const GUIDE = PHYSICS_DICE_CONFIG.scene.guidance
 
-export type GuidanceTargets = Map<PhysicsDiceIndex, THREE.Quaternion>
+type GuidanceState = { lastNudgeAtMs: number }
+export type GuidanceStates = Map<PhysicsDiceIndex, GuidanceState>
 
 export function guideDiceToTargets(
   entries: DieEntry[],
   held: PhysicsHeldDice,
   targetDice: PhysicsDiceSet,
-  targets: GuidanceTargets,
+  states: GuidanceStates,
   elapsedMs: number,
 ) {
+  const assignments = assignTargetValues(entries, held, targetDice)
   entries.forEach((entry) => {
-    if (held[entry.index]) return
+    const targetValue = assignments.get(entry.index)
+    if (targetValue === undefined) return
     const rotation = entry.body.rotation()
     const current = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w)
-    let target = targets.get(entry.index)
-    if (!target) {
-      target = closestQuaternionForTopValue(targetDice[entry.index], current)
-      targets.set(entry.index, target)
-    }
-
+    const target = closestQuaternionForTopValue(targetValue, current)
     const correction = quaternionError(current, target)
-    if (elapsedMs >= GUIDE.orientationLockAfterMs) {
-      const nextRotation = stepQuaternionTowardTarget(current, target, GUIDE.rotationStep)
-      const position = entry.body.translation()
-      const landingY =
-        (PHYSICS_DICE_CONFIG.defaults.diceSize * PHYSICS_DICE_CONFIG.scene.bowlDiceScale) / 2 +
-        0.025
-      entry.body.wakeUp()
-      entry.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
-      entry.body.setRotation(nextRotation, true)
-      entry.body.setTranslation(
-        {
-          x: position.x,
-          y: THREE.MathUtils.lerp(position.y, landingY, GUIDE.landingStep),
-          z: position.z,
-        },
-        true,
-      )
-      entry.body.setLinvel({ x: 0, y: 0, z: 0 }, true)
-      entry.body.setAngvel({ x: 0, y: 0, z: 0 }, true)
+    const angular = entry.body.angvel()
+    const angularVelocity = new THREE.Vector3(angular.x, angular.y, angular.z)
+    const targetOnTop = topFaceFromQuaternion(current) === targetValue
+
+    if (targetOnTop) {
+      const dampingImpulse = angularVelocity.multiplyScalar(-GUIDE.targetDamping)
+      if (dampingImpulse.lengthSq() > GUIDE.maxTorqueImpulse ** 2) {
+        dampingImpulse.setLength(GUIDE.maxTorqueImpulse)
+      }
+      entry.body.applyTorqueImpulse(dampingImpulse, true)
       return
     }
 
-    const angular = entry.body.angvel()
-    const impulse = correction.axis
-      .multiplyScalar(Math.min(GUIDE.maxTorqueImpulse, correction.angle * GUIDE.strength))
-      .addScaledVector(new THREE.Vector3(angular.x, angular.y, angular.z), -GUIDE.damping)
-
-    if (impulse.lengthSq() > GUIDE.maxTorqueImpulse ** 2) {
-      impulse.setLength(GUIDE.maxTorqueImpulse)
+    const position = entry.body.translation()
+    if (position.y >= GUIDE.airborneHeight) {
+      const desiredSpeed = Math.min(GUIDE.maxAngularSpeed, correction.angle * GUIDE.angularGain)
+      const desiredVelocity = correction.axis.multiplyScalar(desiredSpeed)
+      angularVelocity.lerp(desiredVelocity, GUIDE.angularVelocityBlend)
+      entry.body.setAngvel(angularVelocity, true)
+      return
     }
-    entry.body.wakeUp()
-    entry.body.applyTorqueImpulse(impulse, true)
-  })
-}
 
-export function stepQuaternionTowardTarget(
-  current: THREE.QuaternionLike,
-  target: THREE.QuaternionLike,
-  step: number,
-) {
-  const targetQuaternion = new THREE.Quaternion(target.x, target.y, target.z, target.w)
-  const next = new THREE.Quaternion(current.x, current.y, current.z, current.w).slerp(
-    targetQuaternion,
-    step,
-  )
-  return quaternionError(next, targetQuaternion).angle <= GUIDE.angleTolerance
-    ? targetQuaternion
-    : next
+    const state = states.get(entry.index) ?? { lastNudgeAtMs: -Infinity }
+    states.set(entry.index, state)
+    if (
+      angularVelocity.length() <= GUIDE.nudgeMaxAngularSpeed &&
+      elapsedMs - state.lastNudgeAtMs >= GUIDE.nudgeIntervalMs
+    ) {
+      state.lastNudgeAtMs = elapsedMs
+      const linear = entry.body.linvel()
+      const desiredSpeed = Math.min(GUIDE.maxAngularSpeed, correction.angle * GUIDE.angularGain)
+      entry.body.setLinvel({ x: linear.x * 0.5, y: GUIDE.nudgeLiftSpeed, z: linear.z * 0.5 }, true)
+      entry.body.setAngvel(correction.axis.multiplyScalar(desiredSpeed), true)
+      return
+    }
+
+    const dampingImpulse = angularVelocity.multiplyScalar(-GUIDE.groundDamping)
+    if (dampingImpulse.lengthSq() > GUIDE.maxTorqueImpulse ** 2) {
+      dampingImpulse.setLength(GUIDE.maxTorqueImpulse)
+    }
+    entry.body.applyTorqueImpulse(dampingImpulse, true)
+  })
 }
 
 export function areDiceAtTargets(
   entries: DieEntry[],
   held: PhysicsHeldDice,
-  targets: GuidanceTargets,
+  targetDice: PhysicsDiceSet,
 ) {
-  return entries
+  const actual = entries
     .filter((entry) => !held[entry.index])
-    .every((entry) => {
-      const target = targets.get(entry.index)
-      if (!target) return false
-      const rotation = entry.body.rotation()
-      const current = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w)
-      return quaternionError(current, target).angle <= GUIDE.angleTolerance
-    })
+    .map((entry) => topFaceFromQuaternion(entry.body.rotation()))
+    .sort()
+  const target = targetDice.filter((_, index) => !held[index]).sort()
+  return actual.every((value, index) => value === target[index])
+}
+
+export function readTopDice(entries: DieEntry[]): PhysicsDiceSet {
+  return entries.map((entry) => topFaceFromQuaternion(entry.body.rotation())) as [
+    PhysicsDiceSet[0],
+    PhysicsDiceSet[1],
+    PhysicsDiceSet[2],
+    PhysicsDiceSet[3],
+    PhysicsDiceSet[4],
+  ]
 }
 
 export function quaternionError(current: THREE.QuaternionLike, target: THREE.QuaternionLike) {
@@ -106,4 +104,44 @@ export function quaternionError(current: THREE.QuaternionLike, target: THREE.Qua
       ? new THREE.Vector3(0, 1, 0)
       : new THREE.Vector3(error.x / sine, error.y / sine, error.z / sine)
   return { angle, axis }
+}
+
+function assignTargetValues(
+  entries: DieEntry[],
+  held: PhysicsHeldDice,
+  targetDice: PhysicsDiceSet,
+) {
+  const active = entries.filter((entry) => !held[entry.index])
+  const remaining = targetDice.filter((_, index) => !held[index])
+  const assignments = new Map<PhysicsDiceIndex, PhysicsDiceSet[number]>()
+  const unmatched: DieEntry[] = []
+
+  active.forEach((entry) => {
+    const top = topFaceFromQuaternion(entry.body.rotation())
+    const match = remaining.indexOf(top)
+    if (match < 0) {
+      unmatched.push(entry)
+      return
+    }
+    assignments.set(entry.index, top)
+    remaining.splice(match, 1)
+  })
+
+  unmatched.forEach((entry) => {
+    const rotation = entry.body.rotation()
+    const current = new THREE.Quaternion(rotation.x, rotation.y, rotation.z, rotation.w)
+    let bestIndex = 0
+    let bestAngle = Infinity
+    remaining.forEach((value, index) => {
+      const target = closestQuaternionForTopValue(value, current)
+      const angle = quaternionError(current, target).angle
+      if (angle >= bestAngle) return
+      bestAngle = angle
+      bestIndex = index
+    })
+    const [value] = remaining.splice(bestIndex, 1)
+    if (value !== undefined) assignments.set(entry.index, value)
+  })
+
+  return assignments
 }

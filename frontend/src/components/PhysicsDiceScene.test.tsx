@@ -76,10 +76,11 @@ describe('PhysicsDiceScene', () => {
     expect(worlds[0]?.startRoll).toHaveBeenCalledOnce()
 
     act(() => {
-      worlds[0]?.callbacks.onRollComplete(request.requestId)
-      worlds[0]?.callbacks.onRollComplete(request.requestId)
+      worlds[0]?.callbacks.onRollComplete(request.requestId, request.targetDice)
+      worlds[0]?.callbacks.onRollComplete(request.requestId, request.targetDice)
     })
     expect(onRollComplete).toHaveBeenCalledOnce()
+    expect(onRollComplete).toHaveBeenCalledWith(request.requestId, request.targetDice)
 
     view.unmount()
     expect(worlds[0]?.destroy).toHaveBeenCalledOnce()

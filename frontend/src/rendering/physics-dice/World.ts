@@ -4,7 +4,7 @@ import { disposeAppearance, syncAppearance } from './appearance'
 import { createBowl, createKeepSlots, createTray } from './arena'
 import { PHYSICS_DICE_CONFIG } from './config'
 import { createDiceInstances } from './diceInstances'
-import { areDiceAtTargets, type GuidanceTargets, guideDiceToTargets } from './guidance'
+import { areDiceAtTargets, type GuidanceStates, guideDiceToTargets, readTopDice } from './guidance'
 import { pickDie } from './interaction'
 import {
   keepSlotPosition,
@@ -64,7 +64,7 @@ export class PhysicsDiceWorld {
   private floorMaterial!: THREE.MeshStandardMaterial
   private frameId: number | null = null
   private geometries!: PhysicsDiceGeometries
-  private guidanceTargets: GuidanceTargets = new Map()
+  private guidanceStates: GuidanceStates = new Map()
   private held: PhysicsHeldDice = NO_HELD
   private heldOrder: PhysicsDiceIndex[] = []
   private keyLight!: THREE.DirectionalLight
@@ -88,6 +88,7 @@ export class PhysicsDiceWorld {
   private resizeTimer: ReturnType<typeof setTimeout> | null = null
   private rollStartedAt = 0
   private scene!: THREE.Scene
+  private settledDice: PhysicsDiceSet | null = null
   private shakeStartedAt = 0
   private stableFrames = 0
   private themeObserver?: MutationObserver
@@ -143,8 +144,9 @@ export class PhysicsDiceWorld {
     if (!this.world || this.phase !== 'idle' || this.request?.requestId === request.requestId)
       return
     this.request = request
+    this.settledDice = null
     this.layoutAnimating = false
-    this.guidanceTargets.clear()
+    this.guidanceStates.clear()
     this.random = createPhysicsDiceRandom(request.seed)
     this.updateHeldOrder(request.held)
     this.held = [...request.held]
@@ -309,7 +311,7 @@ export class PhysicsDiceWorld {
           this.entries,
           this.held,
           this.request.targetDice,
-          this.guidanceTargets,
+          this.guidanceStates,
           time - this.rollStartedAt,
         )
       }
@@ -472,7 +474,8 @@ export class PhysicsDiceWorld {
 
   private checkSettled(time: number) {
     if (this.phase !== 'pouring' || !this.diceReleased || time - this.rollStartedAt < 900) return
-    const targetsAligned = areDiceAtTargets(this.entries, this.held, this.guidanceTargets)
+    const targetsAligned =
+      this.request && areDiceAtTargets(this.entries, this.held, this.request.targetDice)
     const stable =
       this.entries
         .filter((entry) => !this.held[entry.index])
@@ -496,12 +499,8 @@ export class PhysicsDiceWorld {
     this.callbacks.onPhaseChange('aligning')
     this.alignmentStartedAt = time
     this.bowlExitStartedAt = time
-    this.alignmentEntries = prepareAlignmentEntries(
-      this.entries,
-      this.held,
-      this.heldOrder,
-      this.request.targetDice,
-    )
+    this.settledDice = readTopDice(this.entries)
+    this.alignmentEntries = prepareAlignmentEntries(this.entries, this.held, this.heldOrder)
   }
 
   private updateResultAlignment(time: number) {
@@ -518,11 +517,12 @@ export class PhysicsDiceWorld {
     this.updateBowlExit(time)
     if (progress < 1 || !this.request) return
     const completed = this.request
-    this.committedDice = [...completed.targetDice]
+    const settledDice = this.settledDice ?? completed.targetDice
+    this.committedDice = [...settledDice]
     this.request = null
     this.phase = 'idle'
     this.callbacks.onPhaseChange('idle')
-    this.callbacks.onRollComplete(completed.requestId)
+    this.callbacks.onRollComplete(completed.requestId, settledDice)
   }
 
   private updateBowlExit(time: number) {

@@ -16,7 +16,7 @@ type PhysicsDiceSceneProps = {
   onError?: (error: Error) => void
   onHeldToggle?: (index: PhysicsDiceIndex) => void
   onPhaseChange?: (phase: PhysicsDicePhase) => void
-  onRollComplete: (requestId: string) => void
+  onRollComplete: (requestId: string, dice: PhysicsDiceSet) => void
   quality?: PhysicsDiceQuality
   request: PhysicsDiceRollRequest | null
 }
@@ -59,10 +59,10 @@ export function PhysicsDiceScene({
     let disposed = false
     let createdWorld: PhysicsDiceWorldInstance | null = null
 
-    const completeOnce = (requestId: string) => {
+    const completeOnce = (requestId: string, completedDice: PhysicsDiceSet) => {
       if (completedRequestsRef.current.has(requestId)) return
       completedRequestsRef.current.add(requestId)
-      callbacksRef.current.onRollComplete(requestId)
+      callbacksRef.current.onRollComplete(requestId, completedDice)
     }
     const callbacks: PhysicsDiceWorldCallbacks = {
       onError: (error) => callbacksRef.current.onError?.(error),
