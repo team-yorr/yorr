@@ -17,6 +17,7 @@ describe('LobbyPage', () => {
     navigate.mockReset()
     useAppStore.getState().reset()
     useAppStore.getState().setRoomSession(creatorSession)
+    useAppStore.getState().setConnectionStatus('connected')
   })
 
   it('shows every participant and marks the current player', () => {
@@ -39,6 +40,42 @@ describe('LobbyPage', () => {
     expect(navigate).toHaveBeenCalledWith({
       to: '/rooms/$roomId/game',
       params: { roomId: creatorSession.roomId },
+      replace: true,
     })
+  })
+
+  it('keeps link-copy fallback available next to the QR code', async () => {
+    const user = userEvent.setup()
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    render(<LobbyPage />)
+    await user.click(screen.getByRole('button', { name: '링크 복사' }))
+
+    expect(writeText).toHaveBeenCalledWith(
+      `${window.location.origin}/join?code=${creatorSession.roomCode}`,
+    )
+    expect(screen.getByText('초대 링크를 복사했어요.')).toBeVisible()
+  })
+
+  it('moves once when realtime changes the room phase', async () => {
+    render(<LobbyPage />)
+
+    useAppStore.getState().replaceRoomSnapshot({
+      ...creatorSession.snapshot,
+      phase: 'playing',
+    })
+
+    await waitFor(() =>
+      expect(navigate).toHaveBeenCalledWith({
+        to: '/rooms/$roomId/game',
+        params: { roomId: creatorSession.roomId },
+        replace: true,
+      }),
+    )
+    expect(navigate).toHaveBeenCalledTimes(1)
   })
 })
