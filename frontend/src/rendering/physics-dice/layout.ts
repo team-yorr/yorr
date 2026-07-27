@@ -204,10 +204,7 @@ export function prepareAlignmentEntries(
 
 export function updateAlignmentEntries(entries: AlignmentEntry[], progress: number) {
   const lineUpProgress = Math.min(1, progress / SCENE.alignment.lineUpEnd)
-  const scaleProgress = Math.max(
-    0,
-    Math.min(1, (progress - SCENE.alignment.scaleStart) / (1 - SCENE.alignment.scaleStart)),
-  )
+  const scaleProgress = lineUpProgress
   const lineUpEased = easeInOut(lineUpProgress)
   const scaleEased = easeInOut(scaleProgress)
   const lift = Math.sin(lineUpProgress * Math.PI) * SCENE.alignment.lift
@@ -220,9 +217,7 @@ export function updateAlignmentEntries(entries: AlignmentEntry[], progress: numb
       item.targetQuaternion,
       lineUpEased,
     )
-    const scale =
-      THREE.MathUtils.lerp(item.fromScale, item.targetScale, scaleEased) +
-      (item.held ? 0 : Math.sin(scaleProgress * Math.PI) * SCENE.alignment.scaleOvershoot)
+    const scale = THREE.MathUtils.lerp(item.fromScale, item.targetScale, scaleEased)
     item.entry.mesh.scale.setScalar(scale)
     item.entry.outline.visible = item.held || scaleProgress > 0.3
     item.entry.outline.position.set(item.targetPosition.x, 0.04, item.targetPosition.z)

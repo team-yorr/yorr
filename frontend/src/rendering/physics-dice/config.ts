@@ -112,9 +112,7 @@ export const PHYSICS_DICE_CONFIG = {
     alignment: {
       durationMs: 900,
       lineUpEnd: 0.68,
-      scaleStart: 0.38,
       lift: 0.52,
-      scaleOvershoot: 0.06,
     },
     settlement: { stableFrames: 14 },
     safety: { margin: 0.16, bounce: 0.52 },
