@@ -11,7 +11,7 @@ import { RollResultCallout } from '@/components/RollResultCallout'
 import { RoundTimer } from '@/components/RoundTimer'
 import { PlayerBadge, ScoreSheet } from '@/components/ScoreSheet'
 import { ToastHost, useToast } from '@/components/ToastHost'
-import type { DiceIndex, DiceSet } from '@/domain/dice'
+import type { DiceIndex, DiceSet, HeldDice } from '@/domain/dice'
 import {
   type CategoryScores,
   calculateScoreCandidates,
@@ -32,6 +32,7 @@ import { useMotionRollInput } from '@/input/useMotionRollInput'
 import { useRealtimeClient } from '@/realtime/RealtimeClientContext'
 import type { Player, PlayerId, RoomSnapshot, ScoreBoard } from '@/realtime/wsEvents'
 import { buildClientMessage } from '@/realtime/wsEvents'
+import type { PhysicsDiceMotionPulse } from '@/rendering/physics-dice/types'
 import { type ActiveRoomSession, useAppStore } from '@/store'
 import { useCountdown } from '@/useCountdown'
 import { useMediaQuery } from '@/useMediaQuery'
@@ -42,6 +43,7 @@ const WIDE_LAYOUT = '(min-width: 1024px)'
 const TOTAL_ROUNDS = 12
 const MAX_ROLLS = 3
 const TAP_RELEASE_DELAY_MS = 600
+type RollAnimationMode = RollInputMode | 'remote'
 
 interface GamePlayProps {
   roomId: string
@@ -58,7 +60,10 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   const [sheetOpen, setSheetOpen] = useState(false)
   const [zeroConfirm, setZeroConfirm] = useState<YachtCategory | null>(null)
   const [releaseRequestId, setReleaseRequestId] = useState<string | null>(null)
-  const [rollInputMode, setRollInputMode] = useState<RollInputMode | null>(null)
+  const [rollInputMode, setRollInputMode] = useState<RollAnimationMode | null>(null)
+  const [requestingRoll, setRequestingRoll] = useState(false)
+  const [motionPulse, setMotionPulse] = useState<PhysicsDiceMotionPulse | null>(null)
+  const motionPulseSequenceRef = useRef(0)
   const [submitting, setSubmitting] = useState(false)
   // 굴림마다 id를 새로 발급해 같은 족보가 연속으로 떠도 리마운트되게 한다.
   const [rollHighlight, setRollHighlight] = useState<{ hand: SpecialHand; id: number } | null>(null)
@@ -82,6 +87,16 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   // 서버가 다음 라운드로 넘기면 로컬 굴림 상태를 새로 시작한다.
   if (local.roundNumber !== roundNumber) setLocal(createYachtGame(local.seed, roundNumber))
 
+  const activePlayerRef = useRef(activePlayerId)
+  useEffect(() => {
+    if (activePlayerRef.current === activePlayerId) return
+    activePlayerRef.current = activePlayerId
+    setLocal((state) => createYachtGame(state.seed, roundNumber))
+    setReleaseRequestId(null)
+    setRollInputMode(null)
+    setRequestingRoll(false)
+  }, [activePlayerId, roundNumber])
+
   const dispatch = useCallback((action: YachtGameAction) => {
     setLocal((state) => yachtGameReducer(state, action))
   }, [])
@@ -101,9 +116,10 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   const canRoll =
     !locked &&
     !submitted &&
+    !requestingRoll &&
     rollsLeft > 0 &&
     (local.phase === 'ready' || local.phase === 'choosing')
-  const rolling = local.phase === 'rolling'
+  const rolling = local.phase === 'rolling' || requestingRoll
   // 기록은 점수표·퀵 칩을 탭하는 원큐 흐름이다(디자인 Yacht Play Screens). CTA는 굴리기 하나만 남는다.
   const canPick = !locked && !submitting && local.phase === 'choosing'
 
@@ -172,6 +188,12 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
 
   const rollSequenceRef = useRef(0)
   const inputModeRef = useRef(rollInputMode)
+  const pendingRollRequestRef = useRef<{
+    inputMode: RollInputMode
+    msgId: string
+    requestId: string
+  } | null>(null)
+  const queuedMotionReleaseRef = useRef(false)
   const feedbackRef = useRef<ReturnType<typeof createRollFeedback> | null>(null)
   inputModeRef.current = rollInputMode
   if (!feedbackRef.current) feedbackRef.current = createRollFeedback()
@@ -180,14 +202,85 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
     (inputMode: RollInputMode) => {
       if (!canRoll) return
       rollSequenceRef.current += 1
+      const requestId = `r${roundNumber}-${rollSequenceRef.current}`
+      const msgId = `roll-${roundNumber}-${local.rollCount + 1}-${Date.now()}`
       setReleaseRequestId(null)
       setRollInputMode(inputMode)
-      dispatch({
-        type: 'rollRequested',
-        requestId: `r${roundNumber}-${rollSequenceRef.current}`,
-      })
+      inputModeRef.current = inputMode
+      setRequestingRoll(true)
+      queuedMotionReleaseRef.current = false
+      pendingRollRequestRef.current = { inputMode, msgId, requestId }
+      try {
+        realtimeClient.send(
+          buildClientMessage(
+            'dice.roll',
+            {
+              held: local.held,
+              rollCount: (local.rollCount + 1) as 1 | 2 | 3,
+              roundNumber,
+            },
+            { roomId, msgId },
+          ),
+        )
+      } catch {
+        pendingRollRequestRef.current = null
+        setRequestingRoll(false)
+        setRollInputMode(null)
+        showToast('주사위를 요청하지 못했어요. 연결 상태를 확인해 주세요.')
+      }
     },
-    [canRoll, dispatch, roundNumber],
+    [canRoll, local.held, local.rollCount, realtimeClient, roomId, roundNumber, showToast],
+  )
+
+  useEffect(
+    () =>
+      realtimeClient.onMessage((message) => {
+        if (message.type === 'dice.broadcast') {
+          if (
+            message.roomId !== roomId ||
+            message.payload.roundNumber !== roundNumber ||
+            message.payload.playerId !== activePlayerId
+          ) {
+            return
+          }
+
+          const ownRoll = message.payload.playerId === session.you
+          const pending = pendingRollRequestRef.current
+          if (ownRoll && (!pending || message.msgId !== pending.msgId)) return
+
+          const requestId = ownRoll
+            ? (pending?.requestId ?? `own-${message.msgId ?? message.ts}`)
+            : `remote-${message.payload.playerId}-${message.payload.roundNumber}-${message.payload.rollCount}-${message.msgId ?? message.ts}`
+          const animationMode: RollAnimationMode = ownRoll
+            ? (pending?.inputMode ?? 'tap')
+            : 'remote'
+
+          pendingRollRequestRef.current = null
+          setRequestingRoll(false)
+          setReleaseRequestId(null)
+          setRollInputMode(animationMode)
+          dispatch({
+            type: 'rollRequested',
+            held: message.payload.held as HeldDice,
+            requestId,
+            targetDice: message.payload.dice,
+          })
+          if (ownRoll && queuedMotionReleaseRef.current) {
+            queuedMotionReleaseRef.current = false
+            setReleaseRequestId(requestId)
+          }
+          return
+        }
+
+        const pending = pendingRollRequestRef.current
+        if (message.type === 'error' && pending && message.payload.refMsgId === pending.msgId) {
+          pendingRollRequestRef.current = null
+          setRequestingRoll(false)
+          setRollInputMode(null)
+          showToast(message.payload.message)
+        }
+      }),
+    [activePlayerId, dispatch, realtimeClient, roomId, roundNumber, session.you, showToast],
   )
 
   const handleGestureEvent = useCallback(
@@ -195,6 +288,12 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       switch (event.type) {
         case 'shakePulse':
           feedbackRef.current?.shakePulse(event.direction, event.strength)
+          motionPulseSequenceRef.current += 1
+          setMotionPulse({
+            id: motionPulseSequenceRef.current,
+            direction: event.direction,
+            strength: event.strength,
+          })
           return
         case 'shakeStarted':
           feedbackRef.current?.armed()
@@ -202,7 +301,13 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
           return
         case 'throwDetected': {
           const request = getPendingRoll(local)
-          if (!request || inputModeRef.current !== 'motion') return
+          if (inputModeRef.current !== 'motion') return
+          if (!request) {
+            if (pendingRollRequestRef.current?.inputMode === 'motion') {
+              queuedMotionReleaseRef.current = true
+            }
+            return
+          }
           feedbackRef.current?.thrown()
           setReleaseRequestId(request.requestId)
           return
@@ -219,7 +324,7 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   const pendingRoll = getPendingRoll(local)
 
   useEffect(() => {
-    if (!pendingRoll || rollInputMode !== 'tap') return
+    if (!pendingRoll || (rollInputMode !== 'tap' && rollInputMode !== 'remote')) return
     const timeout = setTimeout(
       () => setReleaseRequestId(pendingRoll.requestId),
       TAP_RELEASE_DELAY_MS,
@@ -245,27 +350,19 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
     setReleaseRequestId(pendingRoll.requestId)
   }
 
-  const completeRoll = (requestId: string, dice: DiceSet) => {
-    const rollCount = (local.rollCount + 1) as 1 | 2 | 3
-    dispatch({ type: 'rollCompleted', requestId, dice })
+  const completeRoll = (requestId: string, _dice: DiceSet) => {
+    const completedDice = pendingRoll?.requestId === requestId ? pendingRoll.targetDice : null
+    if (!completedDice) return
+    dispatch({ type: 'rollCompleted', requestId, dice: completedDice })
     setReleaseRequestId(null)
     setRollInputMode(null)
-    motion.resetGesture('roll-complete')
-    // 킵 포함 5개가 만든 족보를 알린다. 이미 기록한 족보면 쓸 수 없으니 조용히 넘어간다.
-    const hand = detectSpecialHand(dice)
-    if (hand && !isRecorded(myBoard?.categories[hand])) {
-      setRollHighlight({ hand, id: Date.now() })
-    }
-    try {
-      realtimeClient.send(
-        buildClientMessage(
-          'dice.roll',
-          { dice, rollCount, roundNumber },
-          { roomId, msgId: `roll-${roundNumber}-${rollCount}-${Date.now()}` },
-        ),
-      )
-    } catch {
-      showToast('타이머를 갱신하지 못했어요. 연결 상태를 확인해 주세요.')
+    if (isMyTurn) {
+      motion.resetGesture('roll-complete')
+      // 킵 포함 5개가 만든 족보를 알린다. 이미 기록한 족보면 쓸 수 없으니 조용히 넘어간다.
+      const hand = detectSpecialHand(completedDice)
+      if (hand && !isRecorded(myBoard?.categories[hand])) {
+        setRollHighlight({ hand, id: Date.now() })
+      }
     }
   }
 
@@ -343,6 +440,8 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       <PhysicsDiceScene
         dice={local.dice}
         held={local.held}
+        motionFollow={rollInputMode === 'motion'}
+        motionPulse={motionPulse}
         releaseRequestId={releaseRequestId}
         onError={() => feedbackRef.current?.error()}
         onHeldToggle={(index) => dispatch({ type: 'holdToggled', index })}
