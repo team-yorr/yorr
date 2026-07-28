@@ -10,17 +10,22 @@ import {
 } from './dice'
 
 describe('dice', () => {
-  it('creates roll metadata without planning dice values', () => {
+  it('creates roll metadata with the server-authoritative target values', () => {
     const input = {
       requestId: 'roll-1',
       seed: 42,
       held: NO_HELD_DICE,
+      targetDice: [6, 5, 4, 3, 2],
     } as const
 
     const request = createRollRequest(input)
 
-    expect(request).toEqual({ requestId: 'roll-1', seed: 42, held: NO_HELD_DICE })
-    expect(request).not.toHaveProperty('targetDice')
+    expect(request).toEqual({
+      requestId: 'roll-1',
+      seed: 42,
+      held: NO_HELD_DICE,
+      targetDice: [6, 5, 4, 3, 2],
+    })
     expect(nextRollSeed(request.seed)).not.toBe(request.seed)
   })
 
@@ -46,6 +51,7 @@ describe('dice', () => {
         requestId: 'invalid-seed',
         seed: Number.NaN,
         held: NO_HELD_DICE,
+        targetDice: [1, 2, 3, 4, 5],
       }),
     ).toThrow(RangeError)
   })

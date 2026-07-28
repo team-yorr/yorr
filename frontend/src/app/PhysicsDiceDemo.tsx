@@ -32,6 +32,7 @@ export function PhysicsDiceDemo() {
       held,
       requestId: `dev-roll-${requestSequenceRef.current}`,
       seed: seedRef.current,
+      targetDice: [1, 2, 3, 4, 5],
     })
     setReleaseRequestId(null)
     setRequest(nextRequest)

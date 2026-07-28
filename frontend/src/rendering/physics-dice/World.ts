@@ -21,7 +21,6 @@ import {
 import type { PhysicsDiceGeometries, PhysicsDiceMaterials } from './model'
 import { quaternionForTopValue } from './model'
 import { createPhysicsDiceRandom, type PhysicsDiceRandom } from './random'
-import { readTopDice } from './result'
 import type { AlignmentEntry, DieEntry, LayoutEntry } from './runtimeTypes'
 import { containDiceInBowl, containDiceInTray } from './safety'
 import { createStage } from './stage'
@@ -486,7 +485,7 @@ export class PhysicsDiceWorld {
     this.callbacks.onPhaseChange('aligning')
     this.alignmentStartedAt = time
     this.bowlExitStartedAt = time
-    this.settledDice = readTopDice(this.entries)
+    this.settledDice = [...this.request.targetDice]
     this.alignmentEntries = prepareAlignmentEntries(
       this.entries,
       this.held,

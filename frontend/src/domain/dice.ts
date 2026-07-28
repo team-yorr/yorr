@@ -11,12 +11,14 @@ export interface DiceRollRequest {
   requestId: string
   seed: number
   held: HeldDice
+  targetDice: DiceSet
 }
 
 export interface CreateRollRequestInput {
   requestId: string
   seed: number
   held: HeldDice
+  targetDice: DiceSet
 }
 
 export function isDiceValue(value: unknown): value is DiceValue {
@@ -44,11 +46,13 @@ export function createRollRequest({
   held,
   requestId,
   seed,
+  targetDice,
 }: CreateRollRequestInput): DiceRollRequest {
   return {
     requestId,
     seed: normalizeSeed(seed),
     held: [...held],
+    targetDice: [...targetDice],
   }
 }
 

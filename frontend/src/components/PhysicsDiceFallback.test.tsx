@@ -6,6 +6,7 @@ const request = {
   requestId: 'roll-73',
   seed: 73,
   held: [false, false, false, false, false],
+  targetDice: [6, 5, 4, 3, 2],
 } as const
 
 describe('PhysicsDiceFallback', () => {

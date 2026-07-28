@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react'
-import { createPhysicsDiceRandom } from '@/rendering/physics-dice/random'
+import { useEffect, useRef } from 'react'
 import type {
   PhysicsDiceIndex,
   PhysicsDiceRollRequest,
@@ -33,10 +32,7 @@ export function PhysicsDiceFallback({
   const onRollCompleteRef = useRef(onRollComplete)
   const completedRef = useRef(new Set<string>())
   onRollCompleteRef.current = onRollComplete
-  const rolledDice = useMemo(
-    () => (request ? rollFallbackDice(request, dice) : null),
-    [dice, request],
-  )
+  const rolledDice = request?.targetDice ?? null
   const displayedDice =
     request && releaseRequestId === request.requestId && rolledDice
       ? rolledDice
@@ -86,16 +82,4 @@ export function PhysicsDiceFallback({
       </div>
     </section>
   )
-}
-
-function rollFallbackDice(
-  request: PhysicsDiceRollRequest,
-  currentDice: PhysicsDiceSet | null,
-): PhysicsDiceSet {
-  const random = createPhysicsDiceRandom(request.seed)
-  return INITIAL_DICE.map((_, index) =>
-    request.held[index] && currentDice
-      ? currentDice[index]
-      : ((Math.floor(random.next() * 6) + 1) as PhysicsDiceSet[number]),
-  ) as unknown as PhysicsDiceSet
 }
