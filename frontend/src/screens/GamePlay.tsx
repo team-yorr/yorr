@@ -19,7 +19,7 @@ import { RoundTimer } from '@/components/RoundTimer'
 import { ScoreMatrix } from '@/components/ScoreMatrix'
 import { ScorePanel } from '@/components/ScorePanel'
 import { ToastHost, useToast } from '@/components/ToastHost'
-import type { DiceIndex } from '@/domain/dice'
+import type { DiceIndex, DiceSet } from '@/domain/dice'
 import {
   type CategoryScores,
   calculateScoreCandidates,
@@ -217,8 +217,8 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
     setReleaseRequestId(pendingRoll.requestId)
   }
 
-  const completeRoll = (requestId: string) => {
-    dispatch({ type: 'rollCompleted', requestId })
+  const completeRoll = (requestId: string, dice: DiceSet) => {
+    dispatch({ type: 'rollCompleted', requestId, dice })
     setReleaseRequestId(null)
     setRollInputMode(null)
     motion.resetGesture('roll-complete')
