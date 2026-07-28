@@ -42,11 +42,17 @@ const NO_HELD: PhysicsHeldDice = [false, false, false, false, false]
 const INITIAL_DICE: PhysicsDiceSet = [1, 2, 3, 4, 5]
 let rapierReady: Promise<typeof RAPIER> | undefined
 
+/** 이 폭 이하의 컨테이너 크기 변화는 "3D 조정 중" 멈춤 없이 즉시 반영한다.
+ *  배너·힌트 같은 UI 등장이 만드는 수십 px 변화까지 매번 멈추면 게임이 자꾸 끊긴다. */
+const RESIZE_SETTLE_THRESHOLD_PX = 120
+
 export class PhysicsDiceWorld {
   private active = true
   private alignmentEntries: AlignmentEntry[] = []
   private alignmentStartedAt = 0
   private accumulator = 0
+  private appliedHeight = 0
+  private appliedWidth = 0
   private bowlBody!: RAPIER.RigidBody
   private bowlExitStartedAt = 0
   private bowlGroup!: THREE.Group
@@ -257,14 +263,25 @@ export class PhysicsDiceWorld {
     const width = Math.max(1, this.container.clientWidth)
     const height = Math.max(1, this.container.clientHeight)
     const aspect = width / height
-    const vertical = Math.max(this.cameraHorizontal / aspect, SCENE.camera.minHalfHeight)
-    const horizontal = vertical * aspect
+    // 가로를 다 담되 세로는 maxHalfHeight에서 멈춘다 — 세로로 긴 화면(모바일)에서
+    // 빈 바닥을 늘리는 대신 좌우 가장자리(그릇 진입로)를 잘라 주사위를 크게 보여준다.
+    let vertical = Math.max(
+      SCENE.camera.minHalfHeight,
+      Math.min(this.cameraHorizontal / aspect, SCENE.camera.maxHalfHeight),
+    )
+    let horizontal = vertical * aspect
+    if (horizontal < SCENE.camera.minHalfWidth) {
+      horizontal = SCENE.camera.minHalfWidth
+      vertical = horizontal / aspect
+    }
     this.camera.left = -horizontal
     this.camera.right = horizontal
     this.camera.top = vertical
     this.camera.bottom = -vertical
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(width, height, false)
+    this.appliedWidth = width
+    this.appliedHeight = height
     positionKeepSlots(this.keepSlots, this.heldOrder.length, this.keepSlotMaterials)
     this.invalidate()
   }
@@ -571,10 +588,23 @@ export class PhysicsDiceWorld {
 
   private queueSettledResize() {
     if (!this.active) return
+    const width = Math.max(1, this.container.clientWidth)
+    const height = Math.max(1, this.container.clientHeight)
+    const delta = Math.max(
+      Math.abs(width - this.appliedWidth),
+      Math.abs(height - this.appliedHeight),
+    )
+    if (delta === 0) return
+    // 소폭 변화는 즉시 카메라만 다시 맞춘다 — 오버레이·클록 리셋 없이 이어서 재생.
+    if (delta <= RESIZE_SETTLE_THRESHOLD_PX && this.resizeTimer === null) {
+      this.resize()
+      return
+    }
     this.callbacks.onResizeChange(true)
     if (this.resizeTimer !== null) clearTimeout(this.resizeTimer)
     this.resizeTimer = setTimeout(() => {
       if (!this.active) return
+      this.resizeTimer = null
       this.resize()
       this.lastTime = performance.now()
       this.accumulator = 0

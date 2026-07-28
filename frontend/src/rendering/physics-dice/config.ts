@@ -22,7 +22,15 @@ export const PHYSICS_DICE_CONFIG = {
     resultDiceScale: 1.35,
     resultGap: 0.12,
     selectionBorder: { offsetRatio: 0.045, widthRatio: 0.018, cornerRadiusRatio: 0.151 },
-    camera: { simulationHalfWidth: 4.25, resultHalfWidth: 4.25, minHalfHeight: 3.35 },
+    /* maxHalfHeight·minHalfWidth — 세로로 긴 화면에서 빈 바닥 대신 좌우를 잘라낸다.
+       minHalfWidth는 킵 슬롯 5개(±3.14)가 항상 보이는 하한이다. */
+    camera: {
+      simulationHalfWidth: 4.25,
+      resultHalfWidth: 4.25,
+      minHalfHeight: 3.35,
+      maxHalfHeight: 4.6,
+      minHalfWidth: 3.3,
+    },
     /* 디자인 Yacht Play 3D — 롤링 존이 위, 킵 레일이 아래(+z, 화면 아래쪽). */
     tray: {
       halfSize: 2.9,
