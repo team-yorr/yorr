@@ -560,9 +560,10 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
         React가 위치가 같고 타입이 다른 노드를 갈아끼우면서 주사위 영역을 언마운트하고,
         그때마다 rapier 물리 월드와 WebGL 컨텍스트가 통째로 재생성된다.
       */}
+      {/* 뷰포트 높이로 고정하고 페이지 스크롤을 막는다 — 스크롤은 점수시트 내부에서만 일어난다. */}
       <main
         className={cn(
-          'h-svh bg-canvas text-content',
+          'h-svh overflow-hidden bg-canvas text-content',
           wide ? 'grid grid-cols-[26rem_1fr]' : 'flex flex-col',
         )}
       >
