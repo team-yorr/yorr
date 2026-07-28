@@ -56,13 +56,12 @@ export const PHYSICS_DICE_CONFIG = {
     },
     bowl: {
       autoTiltMs: 2400,
-      /* 사발은 롤링 존 가운데에서 흔들리다가(start) 오른쪽 가장자리(pour)로
-         이동한 뒤 기울여 쏟는다 — 좁은 화면에서도 흔드는 동안은 잘리지 않는다. */
+      /* 사발은 롤링 존 가운데(start)에서 흔들리다가, 기울이는 동안 쏟는 위치(pour)까지
+         미끄러지며 쏟고 그대로 오른쪽으로 퇴장한다 — 좁은 화면에서도 흔드는 동안은 잘리지 않는다. */
       startX: 0,
       startZ: -0.6,
       pourX: 2.9,
       pourZ: -0.6,
-      travelDurationMs: 320,
       hoverY: 0.28,
       tiltDurationMs: 520,
       rotationPivotY: 0.72,

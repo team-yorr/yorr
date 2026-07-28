@@ -320,15 +320,9 @@ export class PhysicsDiceWorld {
     if (simulating) this.accumulator += elapsed
     this.updateBowl(time)
     const rollingEntries = this.entries.filter((entry) => !this.held[entry.index])
-    // 흔드는 동안은 물론, 쏟는 위치로 이동하는 동안에도 주사위가 사발을 벗어나지 않게 잡아둔다.
-    const carryingInBowl =
-      this.phase === 'shaking' ||
-      (this.phase === 'pouring' &&
-        !this.diceReleased &&
-        time - this.pourStartedAt < SCENE.bowl.travelDurationMs)
     while (simulating && this.accumulator >= this.world.timestep) {
       this.world.step()
-      if (carryingInBowl) containDiceInBowl(this.entries, this.held, this.bowlBody)
+      if (this.phase === 'shaking') containDiceInBowl(this.entries, this.held, this.bowlBody)
       if (this.phase === 'pouring' && this.diceReleased) containDiceInTray(rollingEntries)
       this.accumulator -= this.world.timestep
     }
@@ -404,24 +398,10 @@ export class PhysicsDiceWorld {
     // 쏟은 뒤에는 그릇 바디를 더 움직이지 않는다 — 예측 복제 시뮬과 실제 진행이 같은
     // 월드 상태를 보게 하기 위한 결정론 조건 (그릇은 이미 기울인 마지막 포즈로 고정).
     if (this.diceReleased) return
+    // 기울이는 동안 사발이 start→pour로 미끄러진다(tiltedBowlPosition이 보간) —
+    // 쏟으면서 오른쪽으로 빠져나가는 한 동작이고, 퇴장 애니메이션이 그대로 이어받는다.
     const elapsed = time - this.pourStartedAt
-
-    // 1단계 — 가운데(start)에서 쏟는 위치(pour)로 수평 이동. 주사위는 사발이 실어 나른다.
-    if (elapsed < SCENE.bowl.travelDurationMs) {
-      const travel = elapsed / SCENE.bowl.travelDurationMs
-      const eased = travel < 0.5 ? 4 * travel ** 3 : 1 - (-2 * travel + 2) ** 3 / 2
-      const x = THREE.MathUtils.lerp(SCENE.bowl.startX, SCENE.bowl.pourX, eased)
-      const z = THREE.MathUtils.lerp(SCENE.bowl.startZ, SCENE.bowl.pourZ, eased)
-      this.bowlBody.setNextKinematicTranslation({ x, y: SCENE.bowl.hoverY, z })
-      this.bowlBody.setNextKinematicRotation({ x: 0, y: 0, z: 0, w: 1 })
-      this.bowlGroup.position.set(x, SCENE.bowl.hoverY, z)
-      this.bowlGroup.rotation.set(0, 0, 0)
-      return
-    }
-
-    // 2단계 — 쏟는 위치에서 기울여 좌측(트레이 중앙)으로 쏟는다.
-    const tiltElapsed = elapsed - SCENE.bowl.travelDurationMs
-    const progress = Math.min(1, tiltElapsed / SCENE.bowl.tiltDurationMs)
+    const progress = Math.min(1, elapsed / SCENE.bowl.tiltDurationMs)
     const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
     const angle =
       THREE.MathUtils.degToRad(SCENE.bowl.tiltDegrees) * SCENE.bowl.tiltDirection * eased
@@ -431,10 +411,7 @@ export class PhysicsDiceWorld {
     this.bowlBody.setNextKinematicRotation(rotation)
     this.bowlGroup.position.set(position.x, position.y, position.z)
     this.bowlGroup.rotation.set(0, 0, angle)
-    if (
-      progress >= 1 &&
-      tiltElapsed >= SCENE.bowl.tiltDurationMs + SCENE.bowl.spillPushDurationMs
-    ) {
+    if (progress >= 1 && elapsed >= SCENE.bowl.tiltDurationMs + SCENE.bowl.spillPushDurationMs) {
       this.releaseFromBowl()
     }
   }

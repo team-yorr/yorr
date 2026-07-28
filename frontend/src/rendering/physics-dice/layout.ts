@@ -50,18 +50,21 @@ export function resultCameraWidth() {
   return Math.max(SCENE.camera.resultHalfWidth, required)
 }
 
-/** 기울임은 쏟는 위치(pourX·pourZ)를 기준으로 돈다 — 흔드는 위치(start)와 분리돼 있다. */
+/** 사발은 흔들던 자리(start)에서 기울어지는 동안 쏟는 위치(pour)까지 미끄러진다 —
+ *  쏟으면서 오른쪽으로 빠져나가는 한 호흡의 동작이고, 퇴장 애니메이션이 그대로 이어받는다. */
 export function tiltedBowlPosition(progress: number, angle: number) {
   return {
     x:
-      SCENE.bowl.pourX +
+      THREE.MathUtils.lerp(SCENE.bowl.startX, SCENE.bowl.pourX, progress) +
       Math.sin(angle) * SCENE.bowl.rotationPivotY +
       progress * SCENE.bowl.tiltTravelX,
     y:
       SCENE.bowl.rotationPivotY * (1 - Math.cos(angle)) +
       SCENE.bowl.hoverY +
       progress * SCENE.bowl.tiltLiftY,
-    z: SCENE.bowl.pourZ + progress * SCENE.bowl.tiltTravelZ,
+    z:
+      THREE.MathUtils.lerp(SCENE.bowl.startZ, SCENE.bowl.pourZ, progress) +
+      progress * SCENE.bowl.tiltTravelZ,
   }
 }
 
