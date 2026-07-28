@@ -50,17 +50,18 @@ export function resultCameraWidth() {
   return Math.max(SCENE.camera.resultHalfWidth, required)
 }
 
+/** 기울임은 쏟는 위치(pourX·pourZ)를 기준으로 돈다 — 흔드는 위치(start)와 분리돼 있다. */
 export function tiltedBowlPosition(progress: number, angle: number) {
   return {
     x:
-      SCENE.bowl.startX +
+      SCENE.bowl.pourX +
       Math.sin(angle) * SCENE.bowl.rotationPivotY +
       progress * SCENE.bowl.tiltTravelX,
     y:
       SCENE.bowl.rotationPivotY * (1 - Math.cos(angle)) +
       SCENE.bowl.hoverY +
       progress * SCENE.bowl.tiltLiftY,
-    z: SCENE.bowl.startZ + progress * SCENE.bowl.tiltTravelZ,
+    z: SCENE.bowl.pourZ + progress * SCENE.bowl.tiltTravelZ,
   }
 }
 
