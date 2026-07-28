@@ -40,10 +40,7 @@ describe('PhysicsDiceFallback', () => {
 
     act(() => frameCallbacks[0]?.(0))
     expect(onRollComplete).toHaveBeenCalledOnce()
-    expect(onRollComplete).toHaveBeenCalledWith(
-      'roll-73',
-      expect.arrayContaining([expect.any(Number)]),
-    )
+    expect(onRollComplete).toHaveBeenCalledWith('roll-73', request.targetDice)
 
     vi.restoreAllMocks()
   })
@@ -81,10 +78,7 @@ describe('PhysicsDiceFallback', () => {
 
     expect(initialCallback).not.toHaveBeenCalled()
     expect(latestCallback).toHaveBeenCalledOnce()
-    expect(latestCallback).toHaveBeenCalledWith(
-      'roll-73',
-      expect.arrayContaining([expect.any(Number)]),
-    )
+    expect(latestCallback).toHaveBeenCalledWith('roll-73', request.targetDice)
     vi.restoreAllMocks()
   })
 })

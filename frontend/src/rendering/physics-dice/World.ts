@@ -21,6 +21,7 @@ import {
 import type { PhysicsDiceGeometries, PhysicsDiceMaterials } from './model'
 import { quaternionForTopValue } from './model'
 import { createPhysicsDiceRandom, type PhysicsDiceRandom } from './random'
+import { cubeAlignmentOffset, predictNaturalDice } from './remap'
 import type { AlignmentEntry, DieEntry, LayoutEntry } from './runtimeTypes'
 import { containDiceInBowl, containDiceInTray } from './safety'
 import { createStage } from './stage'
@@ -68,12 +69,14 @@ export class PhysicsDiceWorld {
   private keyLight!: THREE.DirectionalLight
   private keepSlotMaterials: THREE.Material[] = []
   private keepSlots: THREE.Group[] = []
+  private lastPulseAt = 0
   private lastShakeKick = 0
   private lastTime = 0
   private layoutAnimating = false
   private layoutEntries: LayoutEntry[] = []
   private layoutStartedAt = 0
   private materials!: PhysicsDiceMaterials
+  private motionFollow = false
   private phase: 'idle' | 'shaking' | 'pouring' | 'aligning' = 'idle'
   private playFieldMaterial!: THREE.MeshStandardMaterial
   private pointerHandler = (event: PointerEvent) => this.pick(event)
@@ -87,6 +90,7 @@ export class PhysicsDiceWorld {
   private rollStartedAt = 0
   private scene!: THREE.Scene
   private settledDice: PhysicsDiceSet | null = null
+  private shakeEnergy = 0
   private shakeStartedAt = 0
   private stableFrames = 0
   private themeObserver?: MutationObserver
@@ -144,6 +148,9 @@ export class PhysicsDiceWorld {
     this.request = request
     this.settledDice = null
     this.layoutAnimating = false
+    this.entries.forEach((entry) => {
+      entry.visualOffset.identity()
+    })
     this.random = createPhysicsDiceRandom(request.seed)
     this.updateHeldOrder(request.held)
     this.held = [...request.held]
@@ -153,6 +160,8 @@ export class PhysicsDiceWorld {
     this.shakeStartedAt = performance.now()
     this.lastTime = this.shakeStartedAt
     this.lastShakeKick = 0
+    this.shakeEnergy = this.motionFollow ? SCENE.bowl.followStartEnergy : 0
+    this.lastPulseAt = this.shakeStartedAt
     this.accumulator = 0
     this.stableFrames = 0
     this.diceReleased = false
@@ -222,6 +231,43 @@ export class PhysicsDiceWorld {
       entry.body.wakeUp()
     })
     this.resize()
+    this.invalidate()
+  }
+
+  setMotionFollow(enabled: boolean) {
+    this.motionFollow = enabled
+  }
+
+  /**
+   * 실제 기기 흔들림 펄스 주입 — follow 모드에서 사발 진동 세기의 유일한 에너지원.
+   * 펄스가 끊기면 세기가 지수 감쇠해 사발과 주사위가 저절로 잦아든다.
+   */
+  applyShakePulse(direction: 'left' | 'right', strength: number) {
+    if (!this.motionFollow || !this.world || this.phase !== 'shaking') return
+    const now = performance.now()
+    const clamped = Math.min(1, Math.max(0, strength))
+    this.shakeEnergy = Math.min(
+      1,
+      Math.max(
+        this.currentShakeIntensity(now),
+        SCENE.bowl.followPulseFloor + clamped * SCENE.bowl.followPulseGain,
+      ),
+    )
+    this.lastPulseAt = now
+    const sign = direction === 'left' ? -1 : 1
+    const mass = CONFIG.defaults.mass
+    this.entries.forEach((entry) => {
+      if (this.held[entry.index]) return
+      entry.body.applyImpulse(
+        {
+          x: sign * SCENE.bowl.followPulseImpulse * (0.5 + clamped) * mass,
+          y: SCENE.bowl.followPulseLift * (0.5 + clamped) * mass,
+          z: (this.random.next() - 0.5) * SCENE.bowl.shakeRandomImpulse,
+        },
+        true,
+      )
+      entry.body.wakeUp()
+    })
     this.invalidate()
   }
 
@@ -298,12 +344,13 @@ export class PhysicsDiceWorld {
     const simulating = this.phase === 'shaking' || this.phase === 'pouring'
     if (simulating) this.accumulator += elapsed
     this.updateBowl(time)
+    const rollingEntries = this.entries.filter((entry) => !this.held[entry.index])
     while (simulating && this.accumulator >= this.world.timestep) {
       this.world.step()
+      if (this.phase === 'shaking') containDiceInBowl(this.entries, this.held, this.bowlBody)
+      if (this.phase === 'pouring' && this.diceReleased) containDiceInTray(rollingEntries)
       this.accumulator -= this.world.timestep
     }
-    if (this.phase === 'shaking') containDiceInBowl(this.entries, this.held, this.bowlBody)
-    if (this.phase === 'pouring' && this.diceReleased) containDiceInTray(this.entries, this.held)
     if (this.phase === 'aligning') this.updateResultAlignment(time)
     else if (this.layoutAnimating) this.updateLayoutTransition(time)
     else {
@@ -311,7 +358,9 @@ export class PhysicsDiceWorld {
         const position = entry.body.translation()
         const rotation = entry.body.rotation()
         entry.mesh.position.set(position.x, position.y, position.z)
-        entry.mesh.quaternion.set(rotation.x, rotation.y, rotation.z, rotation.w)
+        entry.mesh.quaternion
+          .set(rotation.x, rotation.y, rotation.z, rotation.w)
+          .multiply(entry.visualOffset)
       })
     }
     this.checkSettled(time)
@@ -321,19 +370,22 @@ export class PhysicsDiceWorld {
 
   private updateBowl(time: number) {
     if (this.phase === 'shaking') {
+      // follow 모드는 기기 흔들림 펄스에서 감쇠 중인 세기(0~1)를 쓰고, tap 모드는 항상 1.
+      const intensity = this.currentShakeIntensity(time)
       const elapsed = (time - this.shakeStartedAt) / 1000
-      const x = SCENE.bowl.startX + Math.sin(elapsed * 15) * SCENE.bowl.shakeOffsetX
-      const z = SCENE.bowl.startZ + Math.sin(elapsed * 19 + 0.8) * SCENE.bowl.shakeOffsetZ
-      const bowlVelocityX = Math.cos(elapsed * 15) * 15 * SCENE.bowl.shakeOffsetX
-      const bowlVelocityZ = Math.cos(elapsed * 19 + 0.8) * 19 * SCENE.bowl.shakeOffsetZ
-      const yaw = Math.sin(elapsed * 12) * SCENE.bowl.shakeYaw
-      const lift = Math.abs(Math.sin(elapsed * 11)) * 0.025
+      const x = SCENE.bowl.startX + Math.sin(elapsed * 15) * SCENE.bowl.shakeOffsetX * intensity
+      const z =
+        SCENE.bowl.startZ + Math.sin(elapsed * 19 + 0.8) * SCENE.bowl.shakeOffsetZ * intensity
+      const bowlVelocityX = Math.cos(elapsed * 15) * 15 * SCENE.bowl.shakeOffsetX * intensity
+      const bowlVelocityZ = Math.cos(elapsed * 19 + 0.8) * 19 * SCENE.bowl.shakeOffsetZ * intensity
+      const yaw = Math.sin(elapsed * 12) * SCENE.bowl.shakeYaw * intensity
+      const lift = Math.abs(Math.sin(elapsed * 11)) * 0.025 * intensity
       const rotation = new THREE.Quaternion().setFromAxisAngle(UP, yaw)
       this.bowlBody.setNextKinematicTranslation({ x, y: SCENE.bowl.hoverY + lift, z })
       this.bowlBody.setNextKinematicRotation(rotation)
       this.bowlGroup.position.set(x, SCENE.bowl.hoverY + lift, z)
       this.bowlGroup.rotation.y = yaw
-      if (time - this.lastShakeKick >= SCENE.bowl.shakeIntervalMs) {
+      if (intensity > 0 && time - this.lastShakeKick >= SCENE.bowl.shakeIntervalMs) {
         this.lastShakeKick = time
         this.entries.forEach((entry) => {
           if (this.held[entry.index]) return
@@ -346,23 +398,27 @@ export class PhysicsDiceWorld {
             {
               x:
                 (bowlVelocityX - velocity.x) * SCENE.bowl.shakeFollowStrength * mass +
-                centerX * SCENE.bowl.shakeCenterStrength -
-                centerZ * SCENE.bowl.shakeOrbitStrength +
-                (this.random.next() - 0.5) * SCENE.bowl.shakeRandomImpulse,
-              y: SCENE.bowl.shakeLiftImpulse + this.random.next() * SCENE.bowl.shakeRandomImpulse,
+                (centerX * SCENE.bowl.shakeCenterStrength -
+                  centerZ * SCENE.bowl.shakeOrbitStrength +
+                  (this.random.next() - 0.5) * SCENE.bowl.shakeRandomImpulse) *
+                  intensity,
+              y:
+                (SCENE.bowl.shakeLiftImpulse + this.random.next() * SCENE.bowl.shakeRandomImpulse) *
+                intensity,
               z:
                 (bowlVelocityZ - velocity.z) * SCENE.bowl.shakeFollowStrength * mass +
-                centerZ * SCENE.bowl.shakeCenterStrength +
-                centerX * SCENE.bowl.shakeOrbitStrength +
-                (this.random.next() - 0.5) * SCENE.bowl.shakeRandomImpulse,
+                (centerZ * SCENE.bowl.shakeCenterStrength +
+                  centerX * SCENE.bowl.shakeOrbitStrength +
+                  (this.random.next() - 0.5) * SCENE.bowl.shakeRandomImpulse) *
+                  intensity,
             },
             true,
           )
           entry.body.applyTorqueImpulse(
             {
-              x: (this.random.next() - 0.5) * 0.55,
-              y: (this.random.next() - 0.5) * 0.55,
-              z: (this.random.next() - 0.5) * 0.55,
+              x: (this.random.next() - 0.5) * 0.55 * intensity,
+              y: (this.random.next() - 0.5) * 0.55 * intensity,
+              z: (this.random.next() - 0.5) * 0.55 * intensity,
             },
             true,
           )
@@ -371,6 +427,9 @@ export class PhysicsDiceWorld {
       return
     }
     if (this.phase !== 'pouring') return
+    // 쏟은 뒤에는 그릇 바디를 더 움직이지 않는다 — 예측 복제 시뮬과 실제 진행이 같은
+    // 월드 상태를 보게 하기 위한 결정론 조건 (그릇은 이미 기울인 마지막 포즈로 고정).
+    if (this.diceReleased) return
     const elapsed = time - this.pourStartedAt
     const progress = Math.min(1, elapsed / SCENE.bowl.tiltDurationMs)
     const eased = progress < 0.5 ? 4 * progress ** 3 : 1 - (-2 * progress + 2) ** 3 / 2
@@ -385,6 +444,15 @@ export class PhysicsDiceWorld {
     if (progress >= 1 && elapsed >= SCENE.bowl.tiltDurationMs + SCENE.bowl.spillPushDurationMs) {
       this.releaseFromBowl()
     }
+  }
+
+  /** follow 모드에서 마지막 펄스 이후 지수 감쇠한 흔들림 세기(0~1). tap 모드는 항상 1. */
+  private currentShakeIntensity(time: number) {
+    if (!this.motionFollow) return 1
+    if (this.shakeEnergy <= 0) return 0
+    const decayed =
+      this.shakeEnergy * Math.exp(-(time - this.lastPulseAt) / SCENE.bowl.followDecayMs)
+    return decayed < SCENE.bowl.followMinIntensity ? 0 : decayed
   }
 
   private startLayoutTransition() {
@@ -454,6 +522,25 @@ export class PhysicsDiceWorld {
         true,
       )
     })
+    this.planVisualRemap()
+  }
+
+  /**
+   * 쏟아짐 직후 복제 시뮬로 자연 결과를 예측하고, 주사위가 공중에서 빠르게 회전하는
+   * 지금 시점에 표시 면을 목표값으로 바꿔 끼운다. 예측이 실패해도 정렬 단계가
+   * targetDice로 수렴하므로 연출 품질만 떨어질 뿐 결과는 항상 정확하다.
+   */
+  private planVisualRemap() {
+    const request = this.request
+    if (!request) return
+    const natural = predictNaturalDice(this.world, this.entries, this.held)
+    if (!natural) return
+    this.entries.forEach((entry) => {
+      if (this.held[entry.index]) return
+      entry.visualOffset.copy(
+        cubeAlignmentOffset(request.targetDice[entry.index], natural[entry.index]),
+      )
+    })
   }
 
   private checkSettled(time: number) {
@@ -509,6 +596,11 @@ export class PhysicsDiceWorld {
     const completed = this.request
     const completedDice = this.settledDice
     this.committedDice = [...completedDice]
+    // 오프셋 베이크: 정렬이 body를 목표값의 canonical 회전으로 고정했으므로
+    // 이후 idle 동기화(body × offset)가 어긋나지 않게 오프셋을 소거한다.
+    this.entries.forEach((entry) => {
+      entry.visualOffset.identity()
+    })
     this.request = null
     this.phase = 'idle'
     this.callbacks.onPhaseChange('idle')

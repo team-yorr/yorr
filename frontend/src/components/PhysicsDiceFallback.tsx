@@ -32,16 +32,12 @@ export function PhysicsDiceFallback({
   const onRollCompleteRef = useRef(onRollComplete)
   const completedRef = useRef(new Set<string>())
   onRollCompleteRef.current = onRollComplete
-  const rolledDice = request?.targetDice ?? null
   const displayedDice =
-    request && releaseRequestId === request.requestId && rolledDice
-      ? rolledDice
-      : (dice ?? INITIAL_DICE)
+    request && releaseRequestId === request.requestId ? request.targetDice : (dice ?? INITIAL_DICE)
 
   useEffect(() => {
     if (
       !request ||
-      !rolledDice ||
       releaseRequestId !== request.requestId ||
       completedRef.current.has(request.requestId)
     ) {
@@ -50,10 +46,10 @@ export function PhysicsDiceFallback({
     const frame = requestAnimationFrame(() => {
       if (completedRef.current.has(request.requestId)) return
       completedRef.current.add(request.requestId)
-      onRollCompleteRef.current(request.requestId, rolledDice)
+      onRollCompleteRef.current(request.requestId, request.targetDice)
     })
     return () => cancelAnimationFrame(frame)
-  }, [releaseRequestId, request, rolledDice])
+  }, [releaseRequestId, request])
 
   return (
     <section

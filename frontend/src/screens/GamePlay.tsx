@@ -38,6 +38,7 @@ import { useMotionRollInput } from '@/input/useMotionRollInput'
 import { useRealtimeClient } from '@/realtime/RealtimeClientContext'
 import type { Player, PlayerId, RoomSnapshot, ScoreBoard } from '@/realtime/wsEvents'
 import { buildClientMessage } from '@/realtime/wsEvents'
+import type { PhysicsDiceMotionPulse } from '@/rendering/physics-dice/types'
 import { type ActiveRoomSession, useAppStore } from '@/store'
 import { useCountdown } from '@/useCountdown'
 import { useMediaQuery } from '@/useMediaQuery'
@@ -69,6 +70,8 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   const [releaseRequestId, setReleaseRequestId] = useState<string | null>(null)
   const [rollInputMode, setRollInputMode] = useState<RollAnimationMode | null>(null)
   const [requestingRoll, setRequestingRoll] = useState(false)
+  const [motionPulse, setMotionPulse] = useState<PhysicsDiceMotionPulse | null>(null)
+  const motionPulseSequenceRef = useRef(0)
   const [submitting, setSubmitting] = useState(false)
   const pendingSubmissionRef = useRef<{
     category: YachtCategory
@@ -287,6 +290,12 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       switch (event.type) {
         case 'shakePulse':
           feedbackRef.current?.shakePulse(event.direction, event.strength)
+          motionPulseSequenceRef.current += 1
+          setMotionPulse({
+            id: motionPulseSequenceRef.current,
+            direction: event.direction,
+            strength: event.strength,
+          })
           return
         case 'shakeStarted':
           feedbackRef.current?.armed()
@@ -393,6 +402,8 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       <PhysicsDiceScene
         dice={local.dice}
         held={local.held}
+        motionFollow={rollInputMode === 'motion'}
+        motionPulse={motionPulse}
         releaseRequestId={releaseRequestId}
         onError={() => feedbackRef.current?.error()}
         onHeldToggle={(index) => dispatch({ type: 'holdToggled', index })}
