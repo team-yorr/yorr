@@ -120,9 +120,11 @@
   --ds-color-physics-pip: #171b18;
   --ds-color-physics-accent: #c6f640;
   --ds-color-physics-danger: #ff523f;
-  --ds-color-physics-surface: #e8eadf;
-  --ds-color-physics-line: #b9c0b3;
-  --ds-physics-tray: radial-gradient(circle at 50% 48%, #171c15, #0d100e 72%);
+  /* 3D 트레이 UI(디자인 Yacht Play 3D) — 질감 없는 평면 배색.
+     롤링 존(tray)보다 킵 레일(rail)이 한 단계 밝고, 빈 슬롯 바는 slot을 쓴다. */
+  --ds-physics-tray: #10182a;
+  --ds-color-physics-rail: #1e2941;
+  --ds-color-physics-slot: #42516e;
 
   /* 랜딩 히어로 전용 팔레트. 앱 본편(canvas/surface/brand)보다 어둡고 채도가 낮은
      별도 계열이라 semantic 토큰을 재사용하지 않고 landing 네임스페이스로 분리한다. */

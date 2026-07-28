@@ -64,12 +64,22 @@ export function tiltedBowlPosition(progress: number, angle: number) {
   }
 }
 
-export function positionKeepSlots(slots: THREE.Group[]) {
+export function positionKeepSlots(
+  slots: THREE.Group[],
+  heldCount: number,
+  materials: THREE.Material[],
+) {
+  const [occupied, empty] = materials
   slots.forEach((slot, index) => {
     const position = keepSlotPosition(index)
     slot.position.set(position.x, 0.018, position.z)
     const scale = keepSlotScale()
     slot.scale.set(scale, scale, 1)
+    // 킵된 주사위가 앉은 슬롯의 바만 악센트로 — "킵 = 위치"를 색으로 한 번 더 말한다.
+    const bar = slot.children[0]
+    if (bar instanceof THREE.Mesh && occupied && empty) {
+      bar.material = index < heldCount ? occupied : empty
+    }
   })
 }
 
@@ -89,7 +99,7 @@ export function lineUpDice(
       : new THREE.Vector3(
           (row - (rollingIndices.length - 1) / 2) * resultSpacing(),
           resultCenterY(),
-          0.55,
+          SCENE.tray.resultRowZ,
         )
     const scale = isHeld ? keepSlotScale() : resultDieScale()
     const targetQuaternion = quaternionForTopValue(committedDice[entry.index])
@@ -121,7 +131,11 @@ export function prepareLayoutEntries(
     const row = rolling.indexOf(entry.index)
     const targetPosition = isHeld
       ? keepSlotPosition(slotIndex)
-      : new THREE.Vector3((row - (rolling.length - 1) / 2) * resultSpacing(), resultCenterY(), 0.55)
+      : new THREE.Vector3(
+          (row - (rolling.length - 1) / 2) * resultSpacing(),
+          resultCenterY(),
+          SCENE.tray.resultRowZ,
+        )
     const targetScale = isHeld ? keepSlotScale() : resultDieScale()
     const targetQuaternion = quaternionForTopValue(committedDice[entry.index])
     entry.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
@@ -180,7 +194,11 @@ export function prepareAlignmentEntries(
     const row = rolling.indexOf(entry)
     const targetPosition = isHeld
       ? keepSlotPosition(slotIndex)
-      : new THREE.Vector3((row - (rolling.length - 1) / 2) * resultSpacing(), resultCenterY(), 0.55)
+      : new THREE.Vector3(
+          (row - (rolling.length - 1) / 2) * resultSpacing(),
+          resultCenterY(),
+          SCENE.tray.resultRowZ,
+        )
     const targetQuaternion = quaternionForTopValue(settledDice[entry.index])
     entry.body.setBodyType(RAPIER.RigidBodyType.Fixed, true)
     entry.body.setTranslation(targetPosition, true)

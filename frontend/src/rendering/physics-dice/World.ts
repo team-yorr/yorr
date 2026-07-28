@@ -61,7 +61,6 @@ export class PhysicsDiceWorld {
   private container: HTMLElement
   private diceReleased = false
   private entries: DieEntry[] = []
-  private floorMaterial!: THREE.MeshStandardMaterial
   private frameId: number | null = null
   private geometries!: PhysicsDiceGeometries
   private held: PhysicsHeldDice = NO_HELD
@@ -76,10 +75,11 @@ export class PhysicsDiceWorld {
   private layoutStartedAt = 0
   private materials!: PhysicsDiceMaterials
   private phase: 'idle' | 'shaking' | 'pouring' | 'aligning' = 'idle'
-  private playFieldMaterial!: THREE.MeshStandardMaterial
   private pointerHandler = (event: PointerEvent) => this.pick(event)
   private pourStartedAt = 0
   private quality: PhysicsDiceQuality
+  private railLineMaterial!: THREE.MeshBasicMaterial
+  private railMaterial!: THREE.MeshBasicMaterial
   private random: PhysicsDiceRandom = createPhysicsDiceRandom(0)
   private renderer!: THREE.WebGLRenderer
   private request: PhysicsDiceRollRequest | null = null
@@ -265,7 +265,7 @@ export class PhysicsDiceWorld {
     this.camera.bottom = -vertical
     this.camera.updateProjectionMatrix()
     this.renderer.setSize(width, height, false)
-    positionKeepSlots(this.keepSlots)
+    positionKeepSlots(this.keepSlots, this.heldOrder.length, this.keepSlotMaterials)
     this.invalidate()
   }
 
@@ -290,7 +290,7 @@ export class PhysicsDiceWorld {
     this.bowlGroup.visible = false
     this.bowlBody.setTranslation({ x: 10, y: -5, z: 0 }, false)
     placeDice(this.entries, this.held, this.heldOrder, this.committedDice)
-    positionKeepSlots(this.keepSlots)
+    positionKeepSlots(this.keepSlots, this.heldOrder.length, this.keepSlotMaterials)
     this.resize()
   }
 
@@ -598,11 +598,11 @@ export class PhysicsDiceWorld {
       bowlInnerMaterial: this.bowlInnerMaterial,
       bowlMaterials: this.bowlMaterials,
       entries: this.entries,
-      floorMaterial: this.floorMaterial,
       geometries: this.geometries,
       keepSlotMaterials: this.keepSlotMaterials,
       materials: this.materials,
-      playFieldMaterial: this.playFieldMaterial,
+      railLineMaterial: this.railLineMaterial,
+      railMaterial: this.railMaterial,
       trayMaterials: this.trayMaterials,
     }
   }
