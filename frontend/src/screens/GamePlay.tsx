@@ -465,7 +465,8 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   )
 
   const keyboardHint = (
-    <p className="m-0 px-gutter py-2 text-center text-xs text-content-faint">
+    // 높이를 고정하고 한 줄로 자른다 — 문구 길이 변화가 3D 트레이 높이를 흔들지 않게.
+    <p className="m-0 flex h-9 items-center justify-center truncate px-gutter text-xs whitespace-nowrap text-content-faint">
       {motion.inputMode === 'motion'
         ? getGestureMessage(motion, Boolean(pendingRoll && rollInputMode === 'motion'))
         : '버튼으로 굴리고 Space·Enter·1~5 키도 씁니다'}
@@ -599,8 +600,13 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
           wide ? 'grid grid-cols-[1fr_32.5rem]' : 'flex flex-col',
         )}
       >
-        <div className="flex min-h-0 flex-1 flex-col">
-          <ConnectionBanner status={connectionStatus} />
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          {/* 배너는 오버레이로 띄운다 — 플로우에 끼우면 나타날 때마다 3D 트레이 크기를 밀어
+              씬이 리사이즈된다. 연결 상태는 일시적이라 헤더를 잠깐 덮는 쪽이 낫다. */}
+          <ConnectionBanner
+            className="absolute inset-x-0 top-0 z-banner"
+            status={connectionStatus}
+          />
           {header}
 
           {/* 모바일 기록 패널이 이 컨테이너 아래에 붙는다 — 주사위 씬은 항상 같은 자리다. */}
@@ -611,8 +617,8 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
               className={cn(
                 'flex flex-none items-center px-gutter',
                 wide
-                  ? 'gap-4 border-t-2 border-content py-5'
-                  : 'gap-3 pt-3 pb-[calc(9rem+env(safe-area-inset-bottom))]',
+                  ? 'gap-4 border-t-2 border-content py-4'
+                  : 'gap-2.5 pt-2 pb-[calc(8.75rem+env(safe-area-inset-bottom))]',
               )}
             >
               {actions}
