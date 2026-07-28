@@ -313,15 +313,20 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
 
   const trayLabel = activePlayer
     ? isMyTurn
-      ? `나 · 굴림 ${Math.min(MAX_ROLLS, local.rollCount + 1)}/${MAX_ROLLS}`
-      : `${activePlayer.nickname}의 턴`
+      ? `롤링 존 · 나 · 굴림 ${Math.min(MAX_ROLLS, local.rollCount + 1)}/${MAX_ROLLS}`
+      : `롤링 존 · ${activePlayer.nickname}의 턴`
     : '턴 동기화 중'
+
+  // 킵 레일(트레이 하단 밴드) 라벨 — 위치가 곧 킵 표시이므로 개수·합만 조용히 병기한다.
+  const keptCount = local.held.filter(Boolean).length
+  const keptSum = local.dice
+    ? local.dice.reduce((sum, value, index) => sum + (local.held[index] ? value : 0), 0)
+    : 0
 
   const diceScene = (
     <div
       className={cn(
         'relative min-h-0 flex-1 transition-transform [background:var(--ds-physics-tray)] motion-reduce:transform-none',
-        wide ? 'm-6 mb-0' : 'mx-gutter mt-3',
         motion.lastPulseDirection === 'left' && '-translate-x-1',
         motion.lastPulseDirection === 'right' && 'translate-x-1',
       )}
@@ -329,9 +334,12 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       <div className="pointer-events-none absolute top-3 left-4 z-10 text-[10px] font-bold tracking-[0.13em] text-content-faint uppercase">
         {trayLabel}
       </div>
-      {wide && (
-        <div className="pointer-events-none absolute top-2.5 right-3 z-10">{playerBadges}</div>
-      )}
+      <div className="pointer-events-none absolute top-2.5 right-3 z-10">
+        <RollCounter rollsUsed={local.rollCount} />
+      </div>
+      <div className="pointer-events-none absolute bottom-2.5 left-4 z-10 text-[10px] font-bold tracking-[0.13em] text-content-faint uppercase">
+        킵 레일 · {keptCount > 0 ? `${keptCount}/5 · 합 ${keptSum}` : '비어 있음'}
+      </div>
       <PhysicsDiceScene
         dice={local.dice}
         held={local.held}
@@ -346,7 +354,7 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       {canRoll && local.dice === null && !pendingRoll && (
         <button
           aria-label="주사위 굴리기"
-          className="absolute inset-0 z-10 grid cursor-pointer place-items-end justify-center border-0 bg-transparent pb-14 focus-visible:outline-3 focus-visible:outline-focus focus-visible:-outline-offset-4"
+          className="absolute inset-0 z-10 grid cursor-pointer place-items-center border-0 bg-transparent focus-visible:outline-3 focus-visible:outline-focus focus-visible:-outline-offset-4"
           onClick={handleRoll}
           type="button"
         >
@@ -364,7 +372,7 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       )}
       {pendingRoll && rollInputMode === 'motion' && (
         <Button
-          className="absolute top-3 right-3 z-20 shadow-raised"
+          className="absolute top-14 right-3 z-20 shadow-raised"
           disabled={releaseRequestId !== null}
           onClick={confirmThrow}
         >
@@ -404,7 +412,6 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
             label="지금 차례"
             value={activePlayer ? (isMyTurn ? '나' : activePlayer.nickname) : '—'}
           />
-          <HeaderStat label="남은 굴림" value={String(rollsLeft)} />
           <div className="ml-auto w-52 min-w-0">
             <RoundTimer
               compact
@@ -458,7 +465,7 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
   )
 
   const keyboardHint = (
-    <p className="m-0 px-gutter text-center text-xs text-content-faint">
+    <p className="m-0 px-gutter py-2 text-center text-xs text-content-faint">
       {motion.inputMode === 'motion'
         ? getGestureMessage(motion, Boolean(pendingRoll && rollInputMode === 'motion'))
         : '버튼으로 굴리고 Space·Enter·1~5 키도 씁니다'}
@@ -508,21 +515,46 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
     </ul>
   )
 
+  // 킵 레일을 통째로 비우는 보조 동작(디자인 Yacht Play 3D의 Release all).
+  const canReleaseAll =
+    keptCount > 0 &&
+    !locked &&
+    !submitted &&
+    local.phase === 'choosing' &&
+    local.rollCount < MAX_ROLLS
+  const releaseAll = () => {
+    local.held.forEach((isHeld, index) => {
+      if (isHeld) dispatch({ type: 'holdToggled', index: index as DiceIndex })
+    })
+  }
+
   // 기록은 점수표·칩 탭으로 끝나므로 CTA는 굴리기 하나다(디자인 하단 바).
   const actions =
     submitted || !isMyTurn ? (
       waitingNotice
     ) : (
-      <Button
-        className={cn('min-h-15 rounded-panel text-[17px]', wide ? 'w-[300px]' : 'flex-1')}
-        disabled={!canRoll}
-        loading={rolling || submitting}
-        onClick={handleRoll}
-        size="lg"
-      >
-        {rolling ? '굴리는 중' : '굴리기'}
-        {wide && !rolling && <span className="ml-2 text-xs font-medium opacity-70">Space</span>}
-      </Button>
+      <>
+        <Button
+          className={cn('min-h-15 rounded-panel text-[17px]', wide ? 'w-[300px]' : 'flex-1')}
+          disabled={!canRoll}
+          loading={rolling || submitting}
+          onClick={handleRoll}
+          size="lg"
+        >
+          {rolling ? '굴리는 중' : '굴리기'}
+          {wide && !rolling && <span className="ml-2 text-xs font-medium opacity-70">Space</span>}
+        </Button>
+        {wide && (
+          <Button
+            className="min-h-15"
+            disabled={!canReleaseAll}
+            onClick={releaseAll}
+            variant="ghost"
+          >
+            모두 해제
+          </Button>
+        )}
+      </>
     )
 
   const scoreSheet = (className?: string) => (
@@ -564,22 +596,9 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
       <main
         className={cn(
           'h-svh overflow-hidden bg-canvas text-content',
-          wide ? 'grid grid-cols-[26rem_1fr]' : 'flex flex-col',
+          wide ? 'grid grid-cols-[1fr_32.5rem]' : 'flex flex-col',
         )}
       >
-        {wide ? (
-          <section
-            aria-label="점수 시트"
-            className="flex min-h-0 flex-col border-r-2 border-content"
-          >
-            <div className="flex flex-none items-center justify-between gap-2 px-4 py-3">
-              <span className="text-[11px] font-bold tracking-[0.1em] uppercase">점수 시트</span>
-              <span className="truncate text-[11px] text-content-faint">{sheetHint}</span>
-            </div>
-            {scoreSheet('min-h-0 flex-1')}
-          </section>
-        ) : null}
-
         <div className="flex min-h-0 flex-1 flex-col">
           <ConnectionBanner status={connectionStatus} />
           {header}
@@ -592,12 +611,11 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
               className={cn(
                 'flex flex-none items-center px-gutter',
                 wide
-                  ? 'mt-5 gap-4 border-t-2 border-content py-5'
+                  ? 'gap-4 border-t-2 border-content py-5'
                   : 'gap-3 pt-3 pb-[calc(9rem+env(safe-area-inset-bottom))]',
               )}
             >
               {actions}
-              <RollCounter rollsUsed={local.rollCount} />
               {wide ? (
                 <p className="m-0 ml-auto max-w-80 text-right text-xs leading-relaxed text-content-muted">
                   {statusText}
@@ -618,6 +636,20 @@ export function GamePlay({ roomId, session, snapshot }: GamePlayProps) {
             )}
           </div>
         </div>
+
+        {/* 디자인 Yacht Play 3D — 점수시트는 우측 상시 패널(520px)이다. */}
+        {wide ? (
+          <section
+            aria-label="점수 시트"
+            className="flex min-h-0 flex-col border-l-2 border-content"
+          >
+            <div className="flex flex-none items-center justify-between gap-2 px-4 py-3">
+              <span className="text-[11px] font-bold tracking-[0.1em] uppercase">점수 시트</span>
+              <span className="truncate text-[11px] text-content-faint">{sheetHint}</span>
+            </div>
+            {scoreSheet('min-h-0 flex-1')}
+          </section>
+        ) : null}
       </main>
 
       <ToastHost message={toastMessage} />
