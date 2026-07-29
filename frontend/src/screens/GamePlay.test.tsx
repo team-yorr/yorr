@@ -159,7 +159,7 @@ describe('GamePlay', () => {
 
     // 서버가 쓴 굴림 1회가 로컬 카운터에도 반영돼 남은 굴림이 2회로 줄어든다.
     await user.click(screen.getByRole('button', { name: '굴림 완료' }))
-    expect(screen.getByText('굴림 2회 남음')).toBeVisible()
+    expect(screen.getByText('남은 굴리기 2회')).toBeVisible()
   })
 
   it('tells the player which category the server recorded on their behalf', async () => {
@@ -179,7 +179,7 @@ describe('GamePlay', () => {
       )
     })
 
-    expect(await screen.findByText(/시간이 지나 Choice 20점으로 자동 기록됐어요/)).toBeVisible()
+    expect(await screen.findByText(/시간이 지나 초이스 20점으로 자동 기록됐어요/)).toBeVisible()
   })
 
   it('ignores dice holds while another player owns the turn', async () => {
