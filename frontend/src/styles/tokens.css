@@ -182,11 +182,14 @@
      WCAG 1.4.3 일반 텍스트 기준 4.5:1을 넘겨야 한다. */
   --ds-color-content-faint: #a2937c;
   --ds-color-scrim: rgb(10 8 4 / 66%);
-  /* 굴림 콜아웃 골드 텍스트 외곽선 — 3D 트레이 위에 바로 얹혀도 글자가 뜨게 한다. */
-  --ds-callout-outline:
-    -0.045em 0 var(--ds-color-canvas), 0.045em 0 var(--ds-color-canvas),
-    0 -0.045em var(--ds-color-canvas), 0 0.045em var(--ds-color-canvas),
-    0 0.12em 0.6em rgb(0 0 0 / 55%);
+  /* 굴림 콜아웃 골드 텍스트의 화이트 글로우 — 외곽선 대신 글자에서 빛이 퍼지는 느낌으로
+     3D 트레이 위에서 글자를 띄운다. 팝 애니메이션이 0에서 이 값까지 키운다. */
+  --ds-callout-glow:
+    0 0 0.04em rgb(255 252 240 / 95%), 0 0 0.16em rgb(255 248 224 / 65%),
+    0 0 0.45em rgb(255 240 200 / 40%), 0 0.08em 0.6em rgb(0 0 0 / 35%);
+  --ds-callout-glow-none:
+    0 0 0 rgb(255 252 240 / 0%), 0 0 0 rgb(255 248 224 / 0%), 0 0 0 rgb(255 240 200 / 0%),
+    0 0 0 rgb(0 0 0 / 0%);
 
   /* "사용 완료" 족보의 빗금. 색 말고 패턴으로도 구분되게 하는 두 번째 채널이다. */
   --ds-hatch-used: repeating-linear-gradient(
@@ -243,6 +246,7 @@
   0% {
     transform: scale(0.55);
     opacity: 0;
+    text-shadow: var(--ds-callout-glow-none);
   }
   60% {
     transform: scale(1.08);
@@ -251,6 +255,7 @@
   100% {
     transform: scale(1);
     opacity: 1;
+    text-shadow: var(--ds-callout-glow);
   }
 }
 
