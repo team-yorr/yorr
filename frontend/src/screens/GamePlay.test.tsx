@@ -106,7 +106,7 @@ describe('GamePlay', () => {
 
     await user.click(screen.getByRole('button', { name: '굴림 완료' }))
     expect(screen.getByRole('button', { name: '굴리기' })).toBeEnabled()
-    expect(screen.getByText('굴림 2회 남음')).toBeVisible()
+    expect(screen.getByText('남은 굴리기 2회')).toBeVisible()
   })
 
   it('plays the active player server roll for every other participant', () => {

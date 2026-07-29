@@ -158,7 +158,7 @@ export function ScoreSheet({
         className={cn(
           'grid items-center gap-1 px-3',
           emphasis
-            ? 'min-h-12 border-t-2 border-content'
+            ? 'min-h-12 border-t-2 border-border'
             : 'min-h-8 border-y border-border bg-surface-sunken',
         )}
         style={columns}
@@ -203,7 +203,7 @@ export function ScoreSheet({
       tabIndex={0}
     >
       <div
-        className="sticky top-0 z-sticky grid min-h-9 items-center gap-1 border-b-2 border-content bg-canvas px-3"
+        className="sticky top-0 z-sticky grid min-h-9 items-center gap-1 border-b border-border bg-canvas px-3"
         style={columns}
       >
         <span className="text-[10px] font-bold tracking-[0.08em] text-content-muted uppercase">
