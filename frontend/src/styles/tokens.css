@@ -182,6 +182,12 @@
      WCAG 1.4.3 일반 텍스트 기준 4.5:1을 넘겨야 한다(직전 #5f6b81은 2.56:1로 미달). */
   --ds-color-content-faint: #8b97ad;
   --ds-color-scrim: rgb(10 15 26 / 66%);
+  /* 굴림 콜아웃 골드 텍스트 외곽선 — 3D 트레이 위에 바로 얹혀도 글자가 뜨게 한다. */
+  --ds-callout-outline:
+    -0.045em 0 var(--ds-color-canvas), 0.045em 0 var(--ds-color-canvas),
+    0 -0.045em var(--ds-color-canvas), 0 0.045em var(--ds-color-canvas),
+    0 0.12em 0.6em rgb(0 0 0 / 55%);
+
   /* "사용 완료" 족보의 빗금. 색 말고 패턴으로도 구분되게 하는 두 번째 채널이다. */
   --ds-hatch-used: repeating-linear-gradient(
     45deg,
