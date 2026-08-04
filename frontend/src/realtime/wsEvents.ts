@@ -203,6 +203,30 @@ export interface PingPongSwingPayload {
 
 export type PingPongReadyPayload = Record<string, never>
 
+export interface ControllerPairCreatePayload {
+  gameCode: 'PING_PONG'
+  playerTone: 'blue' | 'red'
+}
+
+export interface ControllerPairJoinPayload {
+  code: string
+}
+
+export interface ControllerPairCreatedPayload {
+  code: string
+}
+
+export interface ControllerPairJoinedPayload {
+  code: string
+  playerTone: 'blue' | 'red'
+}
+
+export interface ControllerPairStatusPayload {
+  connected: boolean
+}
+
+export type ControllerInputPayload = Record<string, never>
+
 /* ----- 석양이 진다 (game.duel.* · 서버 권위) -----
  * 진영 번호를 주지 않는다 — "나를 왼쪽에 두는" 배치는 화면의 몫이고 서버는 playerOrder만 안다.
  */
@@ -668,6 +692,11 @@ export type ClientMessage =
   | WsEnvelope<'game.yacht_dice.round.submit', RoundSubmitPayload>
   | WsEnvelope<'game.ping_pong.swing', PingPongSwingPayload>
   | WsEnvelope<'game.ping_pong.ready', PingPongReadyPayload>
+  | WsEnvelope<'controller.pair.create', ControllerPairCreatePayload>
+  | WsEnvelope<'controller.pair.join', ControllerPairJoinPayload>
+  | WsEnvelope<'controller.pair.leave', ControllerInputPayload>
+  | WsEnvelope<'controller.swing', ControllerInputPayload>
+  | WsEnvelope<'controller.ready', ControllerInputPayload>
   | WsEnvelope<'game.duel.draw', DuelDrawPayload>
 
 export type ServerMessage =
@@ -709,6 +738,11 @@ export type ServerMessage =
   | WsEnvelope<'state.patch', StatePatchPayload>
   | WsEnvelope<'game.ping_pong.state', PingPongState>
   | WsEnvelope<'game.duel.state', DuelState>
+  | WsEnvelope<'controller.pair.created', ControllerPairCreatedPayload>
+  | WsEnvelope<'controller.pair.joined', ControllerPairJoinedPayload>
+  | WsEnvelope<'controller.pair.status', ControllerPairStatusPayload>
+  | WsEnvelope<'controller.swing', ControllerInputPayload>
+  | WsEnvelope<'controller.ready', ControllerInputPayload>
 
 export type WsMessage = ClientMessage | ServerMessage
 

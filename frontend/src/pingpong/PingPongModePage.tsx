@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { Button } from '@/shared/components/Button'
 import { IconBack } from '@/shared/components/Icon'
+import { useMediaQuery } from '@/shared/useMediaQuery'
 import { useSwing } from '@/shared/useSwing'
 import {
   advanceLocalGame,
@@ -20,6 +21,8 @@ import {
   restartLocalGame,
   swingLocalGame,
 } from './localGame'
+import { PhoneControllerPairCard } from './PhoneControllerPairCard'
+import { usePhoneControllerDisplay } from './phoneController'
 import { createScene, type PingPongScene } from './scene3d'
 
 export function PingPongModePage() {
@@ -57,6 +60,10 @@ function sameHud(left: HudState, right: HudState) {
   )
 }
 
+function phonePairEnabled(mode: LocalPingPongMode, wide: boolean) {
+  return mode === 'solo' && wide
+}
+
 function LocalPingPongGame({
   difficulty,
   mode,
@@ -72,6 +79,8 @@ function LocalPingPongGame({
   const [feedback, setFeedback] = useState<LocalFeedback | null>(null)
   const [glFailed, setGlFailed] = useState(false)
   const [hud, setHud] = useState(() => hudOf(gameRef.current))
+  const wide = useMediaQuery('(min-width: 760px)')
+  const showPhonePair = phonePairEnabled(mode, wide)
 
   const showFeedback = useCallback((next: LocalFeedback | null) => {
     if (!next) return
@@ -90,6 +99,12 @@ function LocalPingPongGame({
   const { permission, requestPermission } = useSwing({
     enabled: hud.phase === 'playing',
     onSwing: () => swing(1, true),
+  })
+  const phonePair = usePhoneControllerDisplay({
+    enabled: showPhonePair,
+    onReady: () => {},
+    onSwing: () => swing(1, true),
+    playerTone: 'blue',
   })
 
   useEffect(() => {
@@ -203,6 +218,8 @@ function LocalPingPongGame({
         <LocalScore label={p2Label} score={hud.s2} tone="red" />
       </section>
 
+      <LocalPhonePair pair={phonePair} visible={showPhonePair} />
+
       <div className="relative min-h-0 flex-1 touch-none" onPointerDown={onTap}>
         <canvas
           aria-label="로컬 3D 탁구 코트"
@@ -283,6 +300,21 @@ function LocalPingPongGame({
           : '화면 탭·스페이스·휴대폰 스윙으로 받아치기'}
       </footer>
     </main>
+  )
+}
+
+function LocalPhonePair({
+  pair,
+  visible,
+}: {
+  pair: { code: string | null; connected: boolean }
+  visible: boolean
+}) {
+  if (!visible) return null
+  return (
+    <div className="absolute right-4 bottom-4 z-30">
+      <PhoneControllerPairCard code={pair.code} connected={pair.connected} />
+    </div>
   )
 }
 

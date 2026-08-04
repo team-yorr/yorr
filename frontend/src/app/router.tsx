@@ -30,6 +30,7 @@ const importNicknamePage = () => import('@/room/screens/NicknamePage')
 const importPartyDashboardPage = () => import('@/room/screens/PartyDashboardPage')
 const importPartyOnBigScreenPage = () => import('@/room/screens/PartyOnBigScreenPage')
 const importPingPongModePage = () => import('@/pingpong/PingPongModePage')
+const importPingPongPhoneControllerPage = () => import('@/pingpong/PingPongPhoneControllerPage')
 
 const AuthCallbackPage = lazy(() =>
   importAuthCallbackPage().then((mod) => ({ default: mod.AuthCallbackPage })),
@@ -48,6 +49,11 @@ const PartyOnBigScreenPage = lazy(() =>
 )
 const PingPongModePage = lazy(() =>
   importPingPongModePage().then((mod) => ({ default: mod.PingPongModePage })),
+)
+const PingPongPhoneControllerPage = lazy(() =>
+  importPingPongPhoneControllerPage().then((mod) => ({
+    default: mod.PingPongPhoneControllerPage,
+  })),
 )
 
 /**
@@ -166,6 +172,18 @@ const pingPongRoute = createRoute({
   component: PingPongModePage,
 })
 
+const pingPongControllerRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/pingpong/controller',
+  validateSearch: (search: Record<string, unknown>) => ({
+    code: typeof search.code === 'string' ? search.code.trim().toUpperCase() : '',
+  }),
+  component: () => {
+    const { code } = pingPongControllerRoute.useSearch()
+    return <PingPongPhoneControllerPage code={code} />
+  },
+})
+
 const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/join',
@@ -229,6 +247,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   tutorialRoute,
   pingPongRoute,
+  pingPongControllerRoute,
   authCallbackRoute,
   joinRoute,
   partyRoute,

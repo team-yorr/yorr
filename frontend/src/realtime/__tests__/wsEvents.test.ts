@@ -41,6 +41,26 @@ describe('buildClientMessage', () => {
     expect(withNeither).not.toHaveProperty('roomId')
     expect(withNeither).not.toHaveProperty('msgId')
   })
+
+  it('builds phone controller pairing and input messages', () => {
+    expect(
+      buildClientMessage('controller.pair.create', {
+        gameCode: 'PING_PONG',
+        playerTone: 'red',
+      }),
+    ).toMatchObject({
+      type: 'controller.pair.create',
+      payload: { gameCode: 'PING_PONG', playerTone: 'red' },
+    })
+    expect(buildClientMessage('controller.pair.join', { code: 'ABC234' })).toMatchObject({
+      type: 'controller.pair.join',
+      payload: { code: 'ABC234' },
+    })
+    expect(buildClientMessage('controller.swing', {})).toMatchObject({
+      type: 'controller.swing',
+      payload: {},
+    })
+  })
 })
 
 describe('프로토콜 버전', () => {

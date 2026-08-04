@@ -4,11 +4,14 @@ import { buildClientMessage, type PingPongState, type RoomSnapshot } from '@/rea
 import { isRoomHost } from '@/room/api/roomApi'
 import { useReturnToLobby } from '@/room/api/useGameApi'
 import { Button } from '@/shared/components/Button'
+import { useMediaQuery } from '@/shared/useMediaQuery'
 import { useSwing } from '@/shared/useSwing'
 import type { ActiveRoomSession } from '@/store'
 import { type Fault, flightProgress } from './court'
 import { feedbackTextClass, sharedEventLabel } from './feedback'
+import { PhoneControllerPairCard } from './PhoneControllerPairCard'
 import { ComboBadge, PingPongController } from './PingPongController'
+import { usePhoneControllerDisplay } from './phoneController'
 import { type PlayerTracking, trackIncomingBall } from './playerTracking'
 import { createScene, type FrameState, type PingPongScene } from './scene3d'
 
@@ -22,6 +25,7 @@ interface PingPongGameProps {
 export function PingPongGame({ onLeaveRequest, roomId, session, snapshot }: PingPongGameProps) {
   const client = useRealtimeClient()
   const dashboard = session.membershipRole === 'dashboard'
+  const wide = useMediaQuery('(min-width: 760px)')
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const sceneRef = useRef<PingPongScene | null>(null)
   const trackingRef = useRef({ p1X: 0.5, p2X: 0.5 })
@@ -65,6 +69,12 @@ export function PingPongGame({ onLeaveRequest, roomId, session, snapshot }: Ping
     onSwing: swing,
     enabled: canControl(dashboard, state),
   })
+  const phonePair = usePhoneControllerDisplay({
+    enabled: !dashboard && wide,
+    onReady: ready,
+    onSwing: swing,
+    playerTone: viewerFor(state, session.you) === 2 ? 'red' : 'blue',
+  })
 
   useEffect(() => {
     const interval = window.setInterval(() => setClock(Date.now()), 100)
@@ -82,6 +92,7 @@ export function PingPongGame({ onLeaveRequest, roomId, session, snapshot }: Ping
   }, [swing])
 
   useEffect(() => {
+    if (!dashboard && !wide) return
     const canvas = canvasRef.current
     if (!canvas) return
     const scene = createScene(canvas)
@@ -115,7 +126,7 @@ export function PingPongGame({ onLeaveRequest, roomId, session, snapshot }: Ping
       scene.dispose()
       sceneRef.current = null
     }
-  }, [dashboard])
+  }, [dashboard, wide])
 
   if (!state) {
     return (
@@ -125,12 +136,13 @@ export function PingPongGame({ onLeaveRequest, roomId, session, snapshot }: Ping
     )
   }
 
-  if (dashboard) {
+  if (dashboard || wide) {
     return (
       <PingPongDashboard
         canvasRef={canvasRef}
         clock={clock}
         onClose={onLeaveRequest}
+        pair={dashboard ? null : phonePair}
         snapshot={snapshot}
         state={state}
       />
@@ -158,12 +170,14 @@ function PingPongDashboard({
   canvasRef,
   clock,
   onClose,
+  pair,
   snapshot,
   state,
 }: {
   canvasRef: RefObject<HTMLCanvasElement | null>
   clock: number
   onClose: () => void
+  pair: { code: string | null; connected: boolean } | null
   snapshot: RoomSnapshot
   state: PingPongState
 }) {
@@ -191,9 +205,7 @@ function PingPongDashboard({
           score={state.scores[firstPlayerId] ?? 0}
           tone="blue"
         />
-        <div className="mt-1 rounded-full border border-white/15 bg-black/35 px-3 py-1.5 text-center font-mono text-xs tracking-[0.14em] backdrop-blur-md">
-          PARTY · RALLY {state.rally}
-        </div>
+        <DashboardMode pair={pair} rally={state.rally} />
         <Score
           name={secondPlayer?.nickname ?? 'P2'}
           score={state.scores[secondPlayerId] ?? 0}
@@ -228,11 +240,45 @@ function PingPongDashboard({
         <div className="animate-pp-smash-flash pointer-events-none absolute inset-0 z-[5] bg-[radial-gradient(circle_at_50%_55%,rgb(255_150_110_/_45%),transparent_70%)]" />
       )}
       {state.rally > 0 && <ComboBadge count={state.rally} placement="dashboard" />}
+      <DashboardPairOverlay pair={pair} />
       <p className="pointer-events-none absolute inset-x-0 bottom-5 z-20 m-0 text-center text-sm text-white/55">
-        두 플레이어가 각자 휴대폰으로 조작하고 있어요.
+        {dashboardInstruction(pair)}
       </p>
     </main>
   )
+}
+
+function DashboardMode({
+  pair,
+  rally,
+}: {
+  pair: { code: string | null; connected: boolean } | null
+  rally: number
+}) {
+  return (
+    <div className="mt-1 rounded-full border border-white/15 bg-black/35 px-3 py-1.5 text-center font-mono text-xs tracking-[0.14em] backdrop-blur-md">
+      {pair ? 'ONLINE' : 'PARTY'} · RALLY {rally}
+    </div>
+  )
+}
+
+function DashboardPairOverlay({
+  pair,
+}: {
+  pair: { code: string | null; connected: boolean } | null
+}) {
+  if (!pair) return null
+  return (
+    <div className="absolute right-4 bottom-12 z-20">
+      <PhoneControllerPairCard code={pair.code} connected={pair.connected} />
+    </div>
+  )
+}
+
+function dashboardInstruction(pair: { code: string | null; connected: boolean } | null) {
+  return pair
+    ? '연결한 휴대폰을 휘두르거나 터치해서 조작하세요.'
+    : '두 플레이어가 각자 휴대폰으로 조작하고 있어요.'
 }
 
 function PingPongPreparationDashboard({
