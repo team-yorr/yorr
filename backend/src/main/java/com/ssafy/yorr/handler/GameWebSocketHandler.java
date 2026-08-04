@@ -4,6 +4,7 @@ import com.ssafy.yorr.ws.InMemoryRoomBroadcaster;
 import com.ssafy.yorr.ws.HeartbeatMonitor;
 import com.ssafy.yorr.ws.RealtimeRoomSnapshotService;
 import com.ssafy.yorr.ws.RoomSessionRegistry;
+import com.ssafy.yorr.ws.ControllerPairRegistry;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -41,6 +42,11 @@ import com.ssafy.yorr.ws.dto.DisconnectReason;
 import com.ssafy.yorr.ws.dto.SysDisconnectPayload;
 import com.ssafy.yorr.ws.dto.SysReconnectedPayload;
 import com.ssafy.yorr.ws.dto.RoomPhase;
+import com.ssafy.yorr.ws.dto.ControllerPairCreatePayload;
+import com.ssafy.yorr.ws.dto.ControllerPairJoinPayload;
+import com.ssafy.yorr.ws.dto.ControllerPairCreatedPayload;
+import com.ssafy.yorr.ws.dto.ControllerPairJoinedPayload;
+import com.ssafy.yorr.ws.dto.ControllerPairStatusPayload;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,6 +90,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
      * 방 자체의 TTL(40분)이 상한이므로 그보다 길게 잡을 이유는 없다.
      */
     static final Duration ACTIVE_GAME_GRACE = Duration.ofMinutes(10);
+    private final ControllerPairRegistry controllerPairs;
     private final GameModuleRegistry gameModules;
 
     public GameWebSocketHandler(ObjectMapper objectMapper,
@@ -94,6 +101,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                                 UserService userService,
                                 RoomService roomService,
                                 RoomCloseScheduler roomCloseScheduler,
+                                ControllerPairRegistry controllerPairs,
                                 GameModuleRegistry gameModules) {
         this.objectMapper = objectMapper;
         this.broadcaster = broadcaster;
@@ -103,6 +111,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
         this.userService = userService;
         this.roomService = roomService;
         this.roomCloseScheduler = roomCloseScheduler;
+        this.controllerPairs = controllerPairs;
         this.gameModules = gameModules;
     }
 
@@ -146,7 +155,81 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
             case "voice.join"   -> handleVoiceJoin(session, in);
             case "voice.leave"  -> handleVoiceLeave(session, in);
             case "voice.signal" -> handleVoiceSignal(session, in);
+            case "controller.pair.create" -> handleControllerPairCreate(session, in);
+            case "controller.pair.join" -> handleControllerPairJoin(session, in);
+            case "controller.pair.leave" -> dropControllerPair(session);
+            case "controller.swing", "controller.ready" -> relayControllerInput(session, in);
             default -> handleGameMessage(session, in);
+        }
+    }
+
+    private void handleControllerPairCreate(WebSocketSession session, InboundEnvelope in) throws IOException {
+        ControllerPairCreatePayload payload;
+        try {
+            payload = objectMapper.treeToValue(in.payload(), ControllerPairCreatePayload.class);
+        } catch (Exception exception) {
+            sendError(session, WsErrorCode.INVALID_MESSAGE,
+                    "controller.pair.create payload가 올바르지 않습니다.", in.msgId());
+            return;
+        }
+        if (payload == null || !"PING_PONG".equalsIgnoreCase(payload.gameCode())) {
+            sendError(session, WsErrorCode.INVALID_MESSAGE,
+                    "지원하지 않는 휴대폰 컨트롤러 게임입니다.", in.msgId());
+            return;
+        }
+        dropControllerPair(session);
+        ControllerPairRegistry.Pair pair = controllerPairs.create(session, payload.playerTone());
+        send(session, WsEnvelope.of("controller.pair.created",
+                new ControllerPairCreatedPayload(pair.code())).withMsgId(in.msgId()));
+    }
+
+    private void handleControllerPairJoin(WebSocketSession session, InboundEnvelope in) throws IOException {
+        ControllerPairJoinPayload payload;
+        try {
+            payload = objectMapper.treeToValue(in.payload(), ControllerPairJoinPayload.class);
+        } catch (Exception exception) {
+            sendError(session, WsErrorCode.INVALID_MESSAGE,
+                    "controller.pair.join payload가 올바르지 않습니다.", in.msgId());
+            return;
+        }
+        try {
+            ControllerPairRegistry.Pair pair = controllerPairs.join(
+                    session, payload == null ? null : payload.code());
+            send(session, WsEnvelope.of("controller.pair.joined",
+                    new ControllerPairJoinedPayload(pair.code(), pair.playerTone())).withMsgId(in.msgId()));
+            send(pair.display(), WsEnvelope.of("controller.pair.status",
+                    new ControllerPairStatusPayload(true)));
+        } catch (IllegalArgumentException exception) {
+            sendError(session, WsErrorCode.INVALID_MESSAGE,
+                    "연결할 게임 화면을 찾을 수 없습니다.", in.msgId());
+        } catch (IllegalStateException exception) {
+            sendError(session, WsErrorCode.INVALID_MESSAGE,
+                    "이미 휴대폰이 연결된 게임 화면입니다.", in.msgId());
+        }
+    }
+
+    private void relayControllerInput(WebSocketSession session, InboundEnvelope in) throws IOException {
+        ControllerPairRegistry.Pair pair = controllerPairs.pairOfController(session);
+        if (pair == null || pair.display() == null || !pair.display().isOpen()) {
+            sendError(session, WsErrorCode.NOT_IN_ROOM,
+                    "먼저 게임 화면과 휴대폰을 연결해 주세요.", in.msgId());
+            return;
+        }
+        send(pair.display(), WsEnvelope.of(in.type(), java.util.Map.of()));
+    }
+
+    private void dropControllerPair(WebSocketSession session) {
+        ControllerPairRegistry.Removal removal = controllerPairs.remove(session);
+        if (removal == null) return;
+        WebSocketSession counterpart = removal.displayLeft()
+                ? removal.pair().controller()
+                : removal.pair().display();
+        if (counterpart == null || !counterpart.isOpen()) return;
+        try {
+            send(counterpart, WsEnvelope.of("controller.pair.status",
+                    new ControllerPairStatusPayload(false)));
+        } catch (IOException exception) {
+            log.debug("휴대폰 컨트롤러 연결 종료 알림 실패: {}", counterpart.getId(), exception);
         }
     }
 
@@ -324,6 +407,7 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) throws Exception {
         log.info("연결 닫힘: {} / {}", session.getId(), status);
         heartbeatMonitor.untrack(session);
+        dropControllerPair(session);
         // 아래 분기(오프라인 전이 / 명단 이탈)보다 먼저 해야 한다 — registry.of가 아직
         // 이 세션의 멤버를 돌려주는 동안에만 누구였는지 알 수 있다.
         dropFromVoice(session);

@@ -140,12 +140,13 @@ class QuickMatchServiceIntegrationTest {
         assertThat(matches.status(player.userId()).status()).isEqualTo(QuickMatchResponse.Status.NOT_QUEUED);
     }
 
-    @Test
-    void startsOnlyAfterBothMatchedPlayersConnectTheirWebSockets() {
+    @ParameterizedTest
+    @ValueSource(strings = {"YACHT_DICE", "PING_PONG"})
+    void startsOnlyAfterBothMatchedPlayersConnectTheirWebSockets(String gameCode) {
         UserIdentity first = user("player-a", "A");
         UserIdentity second = user("player-b", "B");
-        matches.enter(first, "YACHT_DICE");
-        String roomId = matches.enter(second, "YACHT_DICE").roomId();
+        matches.enter(first, gameCode);
+        String roomId = matches.enter(second, gameCode).roomId();
         WebSocketSession firstSession = openSession("session-a");
         WebSocketSession secondSession = openSession("session-b");
         sessions.join(roomId, firstSession, first.userId(), first.nickname());

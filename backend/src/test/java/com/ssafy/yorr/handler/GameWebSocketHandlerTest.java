@@ -25,6 +25,7 @@ import com.ssafy.yorr.user.UserType;
 import com.ssafy.yorr.ws.InMemoryRoomBroadcaster;
 import com.ssafy.yorr.ws.HeartbeatMonitor;
 import com.ssafy.yorr.ws.RoomSessionRegistry;
+import com.ssafy.yorr.ws.ControllerPairRegistry;
 import com.ssafy.yorr.ws.RealtimeRoomSnapshotService;
 import com.ssafy.yorr.ws.dto.RoomJoinPayload;
 import com.ssafy.yorr.ws.dto.DiceHoldPayload;
@@ -869,6 +870,39 @@ class GameWebSocketHandlerTest {
         assertThat(singleResponse(stranger)).contains("\"type\":\"error\"", "\"code\":\"NOT_IN_ROOM\"");
     }
 
+    @Test
+    void relaysPhoneControllerInputWithoutJoiningItAsARoomPlayer() throws Exception {
+        WebSocketSession display = session("pair-display");
+        WebSocketSession phone = session("pair-phone");
+
+        handler.handle(display, voiceMessage(
+                "controller.pair.create",
+                Map.of("gameCode", "PING_PONG", "playerTone", "red"),
+                "pair-create"
+        ));
+        String created = singleResponse(display);
+        String code = objectMapper.readTree(created).get("payload").get("code").asText();
+        clearInvocations(display);
+
+        handler.handle(phone, voiceMessage(
+                "controller.pair.join",
+                Map.of("code", code),
+                "pair-join"
+        ));
+
+        assertThat(singleResponse(phone))
+                .contains("\"type\":\"controller.pair.joined\"", "\"playerTone\":\"red\"");
+        assertThat(singleResponse(display))
+                .contains("\"type\":\"controller.pair.status\"", "\"connected\":true");
+        assertThat(registry.of(phone)).isNull();
+        clearInvocations(display);
+
+        handler.handle(phone, voiceMessage("controller.swing", Map.of(), "swing-1"));
+
+        assertThat(singleResponse(display)).contains("\"type\":\"controller.swing\"");
+        assertThat(registry.snapshot("room-a").players()).isEmpty();
+    }
+
     private TextMessage voiceMessage(String type, Map<String, Object> payload, String msgId) throws Exception {
         return new TextMessage(objectMapper.writeValueAsString(new WsEnvelope<>(
                 type,
@@ -995,6 +1029,7 @@ class GameWebSocketHandlerTest {
                     userService,
                     roomService,
                     roomCloseScheduler,
+                    new ControllerPairRegistry(),
                     new GameModuleRegistry(List.of(new YachtDiceGameModule(
                             roundSynchronizationService,
                             roundTimerService,

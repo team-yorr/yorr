@@ -85,6 +85,20 @@ class PartyRoomIntegrationTest {
         assertThat(rooms.isPartyRoom(roomCode)).isFalse();
     }
 
+    @Test
+    void normalPingPongRoomKeepsTwoOnlinePlayers() {
+        String roomCode = creates.createRoom(2, CONTROLLER, "PING_PONG");
+
+        rooms.join(roomCode, new UserIdentity(CONTROLLER, "P1", UserType.GUEST), "token-1");
+        rooms.join(roomCode, new UserIdentity(CONTROLLER_2, "P2", UserType.GUEST), "token-2");
+
+        assertThat(rooms.getSnapshot(roomCode)).satisfies(room -> {
+            assertThat(room.gameCode()).isEqualTo("PING_PONG");
+            assertThat(room.players()).hasSize(2);
+            assertThat(room.hostId()).isEqualTo(CONTROLLER);
+        });
+    }
+
     /** 명단에 없는 방을 없는 방으로 착각하지 않는다 — mode를 못 읽으면 여기서 무너진다. */
     @Test
     void controllerJoinsPartyRoomAsTheOnlyPlayer() {
