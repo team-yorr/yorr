@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/Button'
 import { IconBack } from '@/shared/components/Icon'
 import { useSwing } from '@/shared/useSwing'
 import { useAppStore } from '@/store'
+import { IDEAL1 } from './court'
 import { pingPongSituation, sharedSituationLabel } from './feedback'
 import {
   advanceLocalGame,
@@ -90,11 +91,26 @@ function LocalFeedbackMessage({
   )
 }
 
-function LocalPingPongGame({
+/**
+ * 자동 시연(`auto`)에서 대신 휘두르는 지점 — `IDEAL1`에서 이만큼 이르게 친다. 랠리마다
+ * 번갈아 쓴다: 0.06 이내는 스매시, 0.1 이내는 퍼펙트라 피드백 문구가 섞인다. 한 값으로
+ * 고정하면 같은 문구만 반복되고, 0.16까지 벌리면 전부 아웃·네트가 되어 랠리가 서지 않는다.
+ */
+const AUTO_SWING_OFFSETS = [0.06, 0.1] as const
+
+export function LocalPingPongGame({
+  auto = false,
   difficulty,
   mode,
   onExit,
 }: {
+  /**
+   * 아무도 없는 화면에서 스스로 랠리를 이어가는 시연 모드. 소개 영상 릴(`/intro`)이 실제
+   * 플레이 화면을 그대로 태우려고 쓴다 — 릴에는 라켓을 휘두를 사람이 없다.
+   *
+   * 이 판은 <b>기록으로 남기지 않는다</b>(아래 saveResult). 사람이 이긴 판이 아니다.
+   */
+  auto?: boolean
   difficulty: LocalPingPongDifficulty
   mode: LocalPingPongMode
   onExit: () => void
@@ -166,6 +182,11 @@ function LocalPingPongGame({
       last = now
       const game = gameRef.current
       showFeedback(advanceLocalGame(game, now, dt))
+      // 시연 모드는 공이 내 코트에 들어오는 순간 스스로 받아넘긴다(dir > 0이 넘어오는 공).
+      if (auto && game.phase === 'playing' && game.ball.dir > 0) {
+        const offset = AUTO_SWING_OFFSETS[game.rally % AUTO_SWING_OFFSETS.length] ?? 0.06
+        if (game.ball.pos >= IDEAL1 - offset) showFeedback(swingLocalGame(game, 1, now))
+      }
       const nextHud = hudOf(game)
       if (!sameHud(shownHud, nextHud)) {
         shownHud = nextHud
@@ -184,10 +205,11 @@ function LocalPingPongGame({
       scene.dispose()
       if (labelTimerRef.current !== null) window.clearTimeout(labelTimerRef.current)
     }
-  }, [showFeedback])
+  }, [auto, showFeedback])
 
   const saveResult = useCallback(() => {
-    if (mode !== 'solo' || hud.phase !== 'over') return
+    // 시연 판은 사람이 이긴 판이 아니다 — 랭킹에 올리지 않는다.
+    if (auto || mode !== 'solo' || hud.phase !== 'over') return
     const resultId = resultIdRef.current
     if (submittedResultRef.current === resultId) return
     submittedResultRef.current = resultId
@@ -196,7 +218,7 @@ function LocalPingPongGame({
       humanScore: hud.s1,
       aiScore: hud.s2,
     }).catch(() => {})
-  }, [authSession, hud.phase, hud.s1, hud.s2, mode])
+  }, [auto, authSession, hud.phase, hud.s1, hud.s2, mode])
 
   useEffect(() => saveResult(), [saveResult])
 
