@@ -56,3 +56,10 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+tasks.register('runYachtSimulation', JavaExec) {
+	group = 'verification'
+	description = 'Runs the reproducible Yacht AI policy benchmark and prints JSON.'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.ssafy.yorr.game.yacht.simulation.YachtSimulationCli'
+}
