@@ -21,7 +21,7 @@ export function PartyOnBigScreenPage({ gameKey }: { gameKey: PartyGameKey }) {
         </h1>
         <p className="m-0 text-[15px] leading-[1.6] text-content-muted">
           이 화면이 게임판이 되고, 다른 사람들은 QR을 찍어 폰으로 참여해요. TV·모니터·노트북에서
-          요르를 열면 바로 시작할 수 있어요.
+          YORR를 열면 바로 시작할 수 있어요.
         </p>
       </div>
 

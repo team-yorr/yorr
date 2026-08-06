@@ -92,7 +92,7 @@ export function GamePlayHeader({
       )}
     >
       <h1 className="sr-only">
-        요르 게임 진행 중 · {roundNumber} / {TOTAL_ROUNDS} 라운드
+        YORR 게임 진행 중 · {roundNumber} / {TOTAL_ROUNDS} 라운드
       </h1>
       <HeaderButton label="나가기" onClick={onLeave}>
         <IconClose className="size-4.5" />
@@ -178,7 +178,7 @@ function TurnStatus({
 
         그 폭에서는 `Round`와 넓은 자간을 뺀다. 숫자 쌍(01 / 12)만 남아도 옆의 원형 타이머와
         나란히 놓이면 라운드 진행으로 읽히고, 정확한 낭독은 위의 sr-only h1이 이미 한다
-        (「요르 게임 진행 중 · N / 12 라운드」). nowrap을 함께 걸어 남은 폭이 더 줄어도
+        (「YORR 게임 진행 중 · N / 12 라운드」). nowrap을 함께 걸어 남은 폭이 더 줄어도
         접히는 대신 잘리게 한다 — 접히면 헤더 안에서 줄 수가 흔들린다.
       */}
       <span className="font-mono text-[11px] leading-none font-bold tracking-[0.16em] whitespace-nowrap text-content-muted tabular-nums uppercase max-tiny:tracking-normal">
