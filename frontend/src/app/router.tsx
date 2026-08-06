@@ -30,6 +30,10 @@ const importNicknamePage = () => import('@/room/screens/NicknamePage')
 const importPartyDashboardPage = () => import('@/room/screens/PartyDashboardPage')
 const importPartyOnBigScreenPage = () => import('@/room/screens/PartyOnBigScreenPage')
 const importPingPongModePage = () => import('@/pingpong/PingPongModePage')
+// 소개 영상 릴. 랜딩에서 갈 일이 없으므로 prefetch 목록에는 넣지 않는다.
+const IntroReel = lazy(() =>
+  import('@/app/intro/IntroReel').then((mod) => ({ default: mod.IntroReel })),
+)
 
 const AuthCallbackPage = lazy(() =>
   importAuthCallbackPage().then((mod) => ({ default: mod.AuthCallbackPage })),
@@ -190,6 +194,23 @@ const pingPongRoute = createRoute({
   component: PingPongModePage,
 })
 
+/**
+ * 서비스 소개 영상용 자동 재생 릴. 제품 화면이 아니라 <b>녹화용</b>이라 랜딩에 진입점이 없다.
+ * `?scene=`은 재촬영용 — 4번 씬을 다시 찍으려고 앞의 40초를 매번 기다리지 않는다.
+ */
+const introRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/intro',
+  validateSearch: (search: Record<string, unknown>) => ({
+    ...(Number.isFinite(Number(search.scene)) ? { scene: Number(search.scene) } : {}),
+    ...(search.hold === '1' ? { hold: true as const } : {}),
+  }),
+  component: () => {
+    const { hold, scene } = introRoute.useSearch()
+    return <IntroReel hold={hold ?? false} startAt={scene ?? 0} />
+  },
+})
+
 const joinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/join',
@@ -255,6 +276,7 @@ const routeTree = rootRoute.addChildren([
   tutorialRoute,
   leverageRoute,
   pingPongRoute,
+  introRoute,
   authCallbackRoute,
   joinRoute,
   partyRoute,

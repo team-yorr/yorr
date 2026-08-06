@@ -1,0 +1,266 @@
+/*
+ * 펴진고딕 — 소개 영상 전용 서체.
+ *
+ * 여기에만 두고 제품 화면에는 적용하지 않는다(아래 `.reel-stage`가 릴 무대에만 건다).
+ * 앱 전체 서체는 tokens.css의 `--ds-font-sans`(Pretendard + Space Grotesk)가 SSOT다 —
+ * 영상 한 장 때문에 그것을 갈아치우면 모든 화면의 자폭·행간이 함께 움직인다.
+ *
+ * 있는 굵기는 300 · 400 · 700 세 개뿐이다. 600(`font-semibold`)을 쓰면 브라우저가 700으로
+ * 올려 맞추므로 릴에서는 400과 700만 쓴다.
+ */
+@font-face {
+  font-family: "PyeojinGothic";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2504-1@1.0/PyeojinGothic-Light.woff2")
+    format("woff2");
+  font-weight: 300;
+  /*
+   * `swap`이 아니다. swap은 폰트가 오는 순간 글자가 통째로 갈아치워져 — 릴은 시작하자마자
+   * 큰 글자가 서므로 그 교체가 영상 첫 프레임에 그대로 찍힌다. block은 받는 동안 글자를
+   * 아예 그리지 않으므로 깨진 프레임이 없고, IntroReel이 `document.fonts.ready`까지
+   * 첫 씬을 붙잡으니 그 빈 구간도 화면에 나오지 않는다.
+   */
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PyeojinGothic";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2504-1@1.0/PyeojinGothic-Regular.woff2")
+    format("woff2");
+  font-weight: 400;
+  /*
+   * `swap`이 아니다. swap은 폰트가 오는 순간 글자가 통째로 갈아치워져 — 릴은 시작하자마자
+   * 큰 글자가 서므로 그 교체가 영상 첫 프레임에 그대로 찍힌다. block은 받는 동안 글자를
+   * 아예 그리지 않으므로 깨진 프레임이 없고, IntroReel이 `document.fonts.ready`까지
+   * 첫 씬을 붙잡으니 그 빈 구간도 화면에 나오지 않는다.
+   */
+  font-display: block;
+}
+
+@font-face {
+  font-family: "PyeojinGothic";
+  src: url("https://cdn.jsdelivr.net/gh/projectnoonnu/2504-1@1.0/PyeojinGothic-Bold.woff2")
+    format("woff2");
+  font-weight: 700;
+  /*
+   * `swap`이 아니다. swap은 폰트가 오는 순간 글자가 통째로 갈아치워져 — 릴은 시작하자마자
+   * 큰 글자가 서므로 그 교체가 영상 첫 프레임에 그대로 찍힌다. block은 받는 동안 글자를
+   * 아예 그리지 않으므로 깨진 프레임이 없고, IntroReel이 `document.fonts.ready`까지
+   * 첫 씬을 붙잡으니 그 빈 구간도 화면에 나오지 않는다.
+   */
+  font-display: block;
+}
+
+/*
+ * 릴 무대. 여기서 상속되는 것만 펴진고딕이 되고, `font-mono`가 붙은 것(워드마크 · 숫자 ·
+ * 대문자 라벨)은 자기 선언이 있으므로 Space Grotesk로 남는다 — 워드마크는 브랜드 마크고,
+ * 숫자는 디자인 시스템의 NUMERALS 규칙(tabular)을 따른다.
+ */
+.reel-stage {
+  font-family: "PyeojinGothic", var(--ds-font-sans);
+}
+
+/*
+ * `font-mono`가 붙은 <b>한글</b>도 펴진고딕으로 받는다.
+ *
+ * Space Grotesk에는 한글 글리프가 없다. 그래서 mono 스택을 그대로 두면 한글만 그 뒤의
+ * `ui-monospace`로 떨어져 시스템 고딕으로 그려진다 — 오프닝 부제("설치도 가입도 없이 ·
+ * 폰이 컨트롤러")와 메타 배지("약 15분", "화면 탭 · 폰 스윙")가 실제로 그랬다.
+ *
+ * 폰트 매칭은 <b>글자 단위</b>다. Space Grotesk를 맨 앞에 그대로 두고 펴진고딕을 그 다음에
+ * 끼우면, 숫자·라틴은 종전처럼 Space Grotesk(tabular, 디자인 시스템 NUMERALS 규칙)로
+ * 그려지고 한글만 펴진고딕이 받는다.
+ */
+.reel-stage .font-mono {
+  font-family: "Space Grotesk", "PyeojinGothic", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/*
+ * 실제 플레이 화면을 릴 무대에 태우는 한 줄.
+ *
+ * 제품 화면(요트 `GamePlay` · 탁구 `LocalPingPongGame`)은 `h-svh` — <b>뷰포트</b> 높이로
+ * 고정돼 있다. 릴 무대는 16:9로 잘라 낸 상자라 그대로 두면 화면 아래가 잘린다(창을
+ * 레터박스로 띄우면 잘리는 양이 창 크기마다 달라진다). 무대 안에서만 100%로 되돌린다.
+ *
+ * 레이어 밖에 있는 규칙이라 Tailwind utility(`@layer utilities`)보다 이긴다 — 화면 쪽
+ * 클래스를 고칠 필요가 없다는 뜻이고, 그래서 제품 코드에는 릴을 위한 흔적이 남지 않는다.
+ */
+.reel-screen :is([class*="h-svh"]) {
+  height: 100%;
+}
+
+/*
+ * 센서 권한 안내를 릴에서만 지운다.
+ *
+ * 요트 화면은 모션 센서를 쓸 수 있어 보이면 "모션 센서를 사용해 볼까요?" 패널을 띄운다
+ * (`MotionPermissionPanel`). 소개 영상에서는 권한을 받을 사람이 없고, 화면 위쪽을 덮어
+ * 주사위 트레이를 가린다 — 정작 보여줘야 할 것이 그 아래에 있다.
+ *
+ * 프롭으로 끌 수 없어서(패널 여부는 화면이 센서 지원 여부를 보고 스스로 정한다) 여기서
+ * 가린다. 잡는 것은 클래스가 아니라 <b>접근 가능한 이름</b>이다 — 스타일이 바뀌어도
+ * 안내의 정체가 바뀌지 않는 한 따라 깨지지 않는다.
+ *
+ * 첫 진입 코치마크는 CSS가 아니라 프롭으로 끈다(scenes.tsx의 `guide`) — 그쪽은 화면이
+ * 정식으로 제공하는 스위치가 있다.
+ */
+.reel-screen :is([aria-labelledby="motion-permission-title"], [aria-label="센서 권한 안내"]) {
+  display: none;
+}
+
+/*
+ * 소개 영상용 한 방향 등장 애니메이션.
+ *
+ * 왜 tokens.css가 아닌가: 이 클래스들은 /intro 한 화면만 쓴다. 전역 animation token은
+ * 제품 화면이 공유하는 것만 둔다 — 마케팅용 일회성 연출로 900줄짜리 SSOT를 더 늘리지 않는다.
+ *
+ * 왜 motion이 아니고 CSS인가: 릴은 타임라인이다. 한 씬 안에서 열 개 요소가 순서대로 올라오는
+ * 것은 animation-delay 한 줄이면 끝나고, 이 요소들은 <b>퇴장하지 않는다</b>(씬 자체가
+ * AnimatePresence로 통째로 빠진다) — AnimatePresence가 필요한 자리가 아니다.
+ * transform·opacity만 움직인다.
+ *
+ * 모든 keyframe은 "숨은 상태 → 자연 상태"라서, 모션 감소에서 animation을 지우면 그대로
+ * 최종 상태가 남는다. 그래서 아래 media query가 값을 되돌려 적을 필요가 없다.
+ */
+
+@keyframes reel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.45em);
+  }
+}
+
+@keyframes reel-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes reel-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.86);
+  }
+  62% {
+    transform: scale(1.035);
+  }
+}
+
+/* 헤어라인·취소선이 왼쪽에서 그어진다. 호출부가 transform-origin을 정한다. */
+@keyframes reel-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+/*
+ * 로고 스팅 — 주사위 두 개가 양쪽에서 굴러 들어와 가운데서 맞물린다(닌텐도 스위치 인트로의
+ * 조이콘 두 짝과 같은 문법). 이동은 <b>%</b>다: 주사위 자기 폭의 배수라 무대가 커지든 작아지든
+ * 같은 거리를 굴러 온다(cqw로 적으면 무대 폭에만 비례해 크기와 어긋난다).
+ *
+ * 도착에서 감속하지 않는다(cubic-bezier 끝이 급하다) — 스위치 인트로의 맛은 두 짝이 부드럽게
+ * 만나는 게 아니라 <b>딱 멈추는</b> 데 있다. 멈추는 순간의 충격은 아래 reel-snap·reel-flash가 받는다.
+ */
+@keyframes reel-die-left {
+  from {
+    transform: translateX(-560%) rotate(-540deg);
+  }
+}
+
+@keyframes reel-die-right {
+  from {
+    transform: translateX(560%) rotate(540deg);
+  }
+}
+
+/* 맞물린 순간의 충격. 크기만 한 번 튀고 제자리로 — 위치를 흔들면 두 주사위 사이가 벌어져 보인다. */
+@keyframes reel-snap {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  22% {
+    transform: scale(1.07);
+  }
+  55% {
+    transform: scale(0.985);
+  }
+}
+
+/* 충격의 섬광. 한 프레임 터지고 곧 걷힌다. */
+@keyframes reel-flash {
+  0% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 폰이 손 안에서 흔들리는 것 — 씬이 살아 있는 동안 계속 돈다. */
+@keyframes reel-shake {
+  0%,
+  100% {
+    transform: rotate(-7deg) translateX(-2%);
+  }
+  50% {
+    transform: rotate(7deg) translateX(2%);
+  }
+}
+
+/*
+ * 등장은 <b>느리게</b>, 씬 전환은 빠르게. 둘은 반대 방향으로 튜닝한다 — 전환이 느리면
+ * 챕터 사이가 비어 보이고, 등장이 빠르면 읽기 전에 이미 다 서 있어서 순서가 안 읽힌다.
+ * 전환 쪽 값은 IntroReel의 `SWITCH_SECONDS`에 있다.
+ */
+.reel-rise {
+  animation: reel-rise 900ms var(--ds-ease-snappy) both;
+}
+
+.reel-fade {
+  animation: reel-fade 1100ms ease-out both;
+}
+
+.reel-pop {
+  animation: reel-pop 780ms var(--ds-ease-snappy) both;
+}
+
+.reel-draw {
+  animation: reel-draw 680ms var(--ds-ease-snappy) both;
+}
+
+.reel-shake {
+  animation: reel-shake 620ms ease-in-out infinite;
+}
+
+/* 굴러 들어오는 시간(900ms)이 곧 맞물리는 시각이다 — 스팅의 나머지 지연값이 이 값을 기준으로 선다. */
+.reel-die-left {
+  animation: reel-die-left 900ms cubic-bezier(0.42, 0, 0.28, 1) both;
+}
+
+.reel-die-right {
+  animation: reel-die-right 900ms cubic-bezier(0.42, 0, 0.28, 1) both;
+}
+
+.reel-snap {
+  animation: reel-snap 300ms ease-out both;
+}
+
+.reel-flash {
+  animation: reel-flash 420ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reel-rise,
+  .reel-fade,
+  .reel-pop,
+  .reel-draw,
+  .reel-shake,
+  .reel-die-left,
+  .reel-die-right,
+  .reel-snap,
+  .reel-flash {
+    animation: none;
+  }
+}
