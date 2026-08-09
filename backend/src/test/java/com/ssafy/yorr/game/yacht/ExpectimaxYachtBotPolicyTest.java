@@ -158,6 +158,30 @@ class ExpectimaxYachtBotPolicyTest {
         assertThat(elapsed).isLessThan(Duration.ofSeconds(1));
     }
 
+    @Test
+    void exposesLegalCandidateUtilitiesWithoutChangingTheDecisionRule() {
+        ScoreBoard board = emptyBoard();
+        List<Integer> dice = List.of(6, 6, 1, 6, 6);
+
+        var decision = policy.decide(board, dice, 1);
+        var candidates = policy.evaluateCandidates(board, dice, 1);
+
+        assertThat(candidates).isNotEmpty();
+        assertThat(candidates)
+                .anySatisfy(candidate -> assertThat(candidate.action())
+                        .isEqualTo(ExpectimaxYachtBotPolicy.Action.SCORE));
+        assertThat(candidates)
+                .anySatisfy(candidate -> assertThat(candidate.action())
+                        .isEqualTo(ExpectimaxYachtBotPolicy.Action.HOLD));
+        assertThat(candidates)
+                .anyMatch(candidate ->
+                        candidate.action() == decision.action()
+                                && candidate.held().equals(decision.held())
+                                && candidate.category() == decision.category()
+                                && candidate.teacherUtility() == decision.expectedUtility()
+                );
+    }
+
     private static ScoreBoard emptyBoard() {
         return new ScoreBoard(Map.of(), 0, 0, 0);
     }

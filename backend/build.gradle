@@ -63,3 +63,10 @@ tasks.register('runYachtSimulation', JavaExec) {
 	classpath = sourceSets.main.runtimeClasspath
 	mainClass = 'com.ssafy.yorr.game.yacht.simulation.YachtSimulationCli'
 }
+
+tasks.register('generateYachtTrainingData', JavaExec) {
+	group = 'verification'
+	description = 'Generates JSONL training examples with Expectimax soft-label utilities.'
+	classpath = sourceSets.main.runtimeClasspath
+	mainClass = 'com.ssafy.yorr.game.yacht.simulation.YachtTrainingDataCli'
+}

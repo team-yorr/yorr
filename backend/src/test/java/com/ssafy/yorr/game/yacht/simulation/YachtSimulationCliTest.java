@@ -50,4 +50,15 @@ class YachtSimulationCliTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("unsupported policy");
     }
+
+    @Test
+    void supportsTheDistilledPolicyForBenchmarking() {
+        YachtSimulationReport report = YachtSimulationCli.execute(new String[]{
+                "--policy", "distilled",
+                "--games", "1"
+        });
+
+        assertThat(report.policy()).isEqualTo("distilled");
+        assertThat(report.completedGames()).isEqualTo(1);
+    }
 }

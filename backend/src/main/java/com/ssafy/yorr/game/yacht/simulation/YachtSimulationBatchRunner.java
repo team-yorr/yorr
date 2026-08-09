@@ -45,11 +45,11 @@ public final class YachtSimulationBatchRunner {
             }
         }
         long elapsedMillis = (System.nanoTime() - startedAt) / 1_000_000;
-        return report(policy.name(), split, seedOffset, games, completed, failures, elapsedMillis);
+        return report(policy, split, seedOffset, games, completed, failures, elapsedMillis);
     }
 
     private static YachtSimulationReport report(
-            String policy,
+            YachtSimulationPolicy policy,
             YachtSimulationSplit split,
             long seedOffset,
             int requestedGames,
@@ -59,8 +59,8 @@ public final class YachtSimulationBatchRunner {
     ) {
         if (completed.isEmpty()) {
             return new YachtSimulationReport(
-                    policy, split, seedOffset, requestedGames, 0, failures,
-                    0, 0, 0, 0, 0, 0, elapsedMillis, emptyCategoryStatistics()
+                    policy.name(), split, seedOffset, requestedGames, 0, failures,
+                    0, 0, 0, 0, 0, 0, elapsedMillis, emptyCategoryStatistics(), policy.metrics()
             );
         }
 
@@ -76,7 +76,7 @@ public final class YachtSimulationBatchRunner {
         long decisionNanos = completed.stream().mapToLong(YachtSimulationResult::decisionNanos).sum();
 
         return new YachtSimulationReport(
-                policy,
+                policy.name(),
                 split,
                 seedOffset,
                 requestedGames,
@@ -90,7 +90,8 @@ public final class YachtSimulationBatchRunner {
                 completed.stream().mapToInt(YachtSimulationResult::zeroScoreCount).average().orElseThrow(),
                 decisions == 0 ? 0 : decisionNanos / (double) decisions / 1_000,
                 elapsedMillis,
-                categoryStatistics(completed)
+                categoryStatistics(completed),
+                policy.metrics()
         );
     }
 

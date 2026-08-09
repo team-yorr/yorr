@@ -22,4 +22,11 @@ class YachtSimulationPoliciesTest {
 
         assertThat(result.categoryScores()).hasSize(ScoreCategory.values().length);
     }
+
+    @Test
+    void completesAGameWithTheDistilledPolicyAndExpectimaxFallback() {
+        YachtSimulationResult result = simulator.simulate(13L, YachtSimulationPolicies.distilled());
+
+        assertThat(result.categoryScores()).hasSize(ScoreCategory.values().length);
+    }
 }

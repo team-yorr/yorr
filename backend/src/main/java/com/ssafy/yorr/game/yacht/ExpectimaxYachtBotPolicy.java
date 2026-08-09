@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 @Component
-public class ExpectimaxYachtBotPolicy {
+public class ExpectimaxYachtBotPolicy implements YachtBotPolicy {
 
     private static final int DICE_COUNT = 5;
     private static final int FACE_COUNT = 6;
@@ -45,6 +45,49 @@ public class ExpectimaxYachtBotPolicy {
                 toHeldFlags(dice, holdChoice.heldCounts()),
                 holdChoice.expectedUtility()
         );
+    }
+
+    public List<CandidateEvaluation> evaluateCandidates(ScoreBoard board, List<Integer> dice, int rollCount) {
+        requireState(board, dice, rollCount);
+        Search search = new Search(board);
+        int[] diceCounts = counts(dice);
+        List<CandidateEvaluation> candidates = new ArrayList<>();
+
+        for (ScoreChoice scoreChoice : search.scoreChoices(diceCounts)) {
+            candidates.add(CandidateEvaluation.score(scoreChoice.category(), scoreChoice.utility()));
+        }
+        if (rollCount < MAX_ROLL_COUNT) {
+            for (HoldChoice holdChoice : search.holdChoices(diceCounts, MAX_ROLL_COUNT - rollCount)) {
+                candidates.add(CandidateEvaluation.hold(
+                        toHeldFlags(dice, holdChoice.heldCounts()),
+                        holdChoice.expectedUtility()
+                ));
+            }
+        }
+        return List.copyOf(candidates);
+    }
+
+    public List<CandidateEvaluation> legalCandidates(ScoreBoard board, List<Integer> dice, int rollCount) {
+        requireState(board, dice, rollCount);
+        int[] diceCounts = counts(dice);
+        int[] diceArray = expand(diceCounts);
+        EnumSet<ScoreCategory> openCategories = openCategories(board);
+        boolean choiceDominatedBySmallStraight =
+                openCategories.contains(ScoreCategory.SMALL_STRAIGHT)
+                        && ScoreCategory.SMALL_STRAIGHT.isSatisfiedBy(diceArray);
+        List<CandidateEvaluation> candidates = new ArrayList<>();
+        for (ScoreCategory category : openCategories) {
+            if (category == ScoreCategory.CHOICE && choiceDominatedBySmallStraight) {
+                continue;
+            }
+            candidates.add(CandidateEvaluation.score(category, 0));
+        }
+        if (rollCount < MAX_ROLL_COUNT) {
+            for (HoldPattern pattern : holdPatterns(diceCounts)) {
+                candidates.add(CandidateEvaluation.hold(toHeldFlags(dice, pattern.counts()), 0));
+            }
+        }
+        return List.copyOf(candidates);
     }
 
     private final class Search {
@@ -78,20 +121,11 @@ public class ExpectimaxYachtBotPolicy {
         }
 
         private ScoreChoice bestScore(int[] diceCounts) {
-            int[] dice = expand(diceCounts);
-            boolean choiceDominatedBySmallStraight =
-                    openCategories.contains(ScoreCategory.SMALL_STRAIGHT)
-                            && ScoreCategory.SMALL_STRAIGHT.isSatisfiedBy(dice);
+            List<ScoreChoice> choices = scoreChoices(diceCounts);
             ScoreChoice best = null;
-            for (ScoreCategory category : openCategories) {
-                if (category == ScoreCategory.CHOICE && choiceDominatedBySmallStraight) {
-                    continue;
-                }
-                int score = YachtScoreCalculator.calculateScore(category, dice);
-                double utility = valueEvaluator.categoryUtility(board, category, score);
-                ScoreChoice candidate = new ScoreChoice(category, utility);
-                if (best == null || candidate.isBetterThan(best)) {
-                    best = candidate;
+            for (ScoreChoice choice : choices) {
+                if (best == null || choice.isBetterThan(best)) {
+                    best = choice;
                 }
             }
             if (best == null) {
@@ -100,8 +134,39 @@ public class ExpectimaxYachtBotPolicy {
             return best;
         }
 
+        private List<ScoreChoice> scoreChoices(int[] diceCounts) {
+            int[] dice = expand(diceCounts);
+            boolean choiceDominatedBySmallStraight =
+                    openCategories.contains(ScoreCategory.SMALL_STRAIGHT)
+                            && ScoreCategory.SMALL_STRAIGHT.isSatisfiedBy(dice);
+            List<ScoreChoice> choices = new ArrayList<>();
+            for (ScoreCategory category : openCategories) {
+                if (category == ScoreCategory.CHOICE && choiceDominatedBySmallStraight) {
+                    continue;
+                }
+                int score = YachtScoreCalculator.calculateScore(category, dice);
+                double utility = valueEvaluator.categoryUtility(board, category, score);
+                choices.add(new ScoreChoice(category, utility));
+            }
+            return List.copyOf(choices);
+        }
+
         private HoldChoice bestHold(int[] diceCounts, int rerollsRemaining) {
+            List<HoldChoice> choices = holdChoices(diceCounts, rerollsRemaining);
             HoldChoice best = null;
+            for (HoldChoice choice : choices) {
+                if (best == null || choice.isBetterThan(best)) {
+                    best = choice;
+                }
+            }
+            if (best == null) {
+                throw new IllegalStateException("AI bot has no legal reroll action");
+            }
+            return best;
+        }
+
+        private List<HoldChoice> holdChoices(int[] diceCounts, int rerollsRemaining) {
+            List<HoldChoice> choices = new ArrayList<>();
             for (HoldPattern pattern : holdPatterns(diceCounts)) {
                 int rerolledDiceCount = DICE_COUNT - Arrays.stream(pattern.counts()).sum();
                 double expectedUtility = 0;
@@ -110,15 +175,9 @@ public class ExpectimaxYachtBotPolicy {
                     expectedUtility += outcome.probability()
                             * stateValue(nextDice, rerollsRemaining - 1);
                 }
-                HoldChoice candidate = new HoldChoice(pattern.counts(), expectedUtility);
-                if (best == null || candidate.isBetterThan(best)) {
-                    best = candidate;
-                }
+                choices.add(new HoldChoice(pattern.counts(), expectedUtility));
             }
-            if (best == null) {
-                throw new IllegalStateException("AI bot has no legal reroll action");
-            }
-            return best;
+            return List.copyOf(choices);
         }
     }
 
@@ -139,6 +198,21 @@ public class ExpectimaxYachtBotPolicy {
 
         static BotDecision score(ScoreCategory category, double expectedUtility) {
             return new BotDecision(Action.SCORE, List.of(), category, expectedUtility);
+        }
+    }
+
+    public record CandidateEvaluation(
+            Action action,
+            List<Boolean> held,
+            ScoreCategory category,
+            double teacherUtility
+    ) {
+        static CandidateEvaluation hold(List<Boolean> held, double teacherUtility) {
+            return new CandidateEvaluation(Action.HOLD, List.copyOf(held), null, teacherUtility);
+        }
+
+        static CandidateEvaluation score(ScoreCategory category, double teacherUtility) {
+            return new CandidateEvaluation(Action.SCORE, List.of(), category, teacherUtility);
         }
     }
 

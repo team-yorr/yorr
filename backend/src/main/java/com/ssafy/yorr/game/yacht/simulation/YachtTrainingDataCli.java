@@ -4,54 +4,57 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 
-public final class YachtSimulationCli {
+public final class YachtTrainingDataCli {
 
     private static final ObjectMapper JSON = new ObjectMapper()
             .enable(SerializationFeature.INDENT_OUTPUT);
 
-    private YachtSimulationCli() {
+    private YachtTrainingDataCli() {
     }
 
-    public static void main(String[] args) throws JsonProcessingException {
+    public static void main(String[] args) throws IOException {
         System.out.println(render(execute(args)));
     }
 
-    static YachtSimulationReport execute(String[] args) {
+    static YachtTrainingDatasetSummary execute(String[] args) throws IOException {
         Options options = Options.parse(args);
-        YachtSimulationPolicy policy = switch (options.policy()) {
-            case "heuristic" -> YachtSimulationPolicies.heuristic();
-            case "expectimax" -> YachtSimulationPolicies.expectimax();
-            case "distilled" -> YachtSimulationPolicies.distilled();
-            default -> throw new IllegalArgumentException("unsupported policy: " + options.policy());
-        };
-        return new YachtSimulationBatchRunner().run(
-                policy,
-                options.games(),
+        return new YachtTrainingDataGenerator().generate(
                 options.split(),
-                options.seedOffset()
+                options.games(),
+                options.seedOffset(),
+                options.perStratumLimit(),
+                options.output()
         );
     }
 
-    static String render(YachtSimulationReport report) throws JsonProcessingException {
-        return JSON.writeValueAsString(report);
+    static String render(YachtTrainingDatasetSummary summary) throws JsonProcessingException {
+        return JSON.writeValueAsString(summary);
     }
 
-    record Options(String policy, int games, YachtSimulationSplit split, long seedOffset) {
+    record Options(
+            YachtSimulationSplit split,
+            int games,
+            long seedOffset,
+            int perStratumLimit,
+            Path output
+    ) {
 
         private static final int DEFAULT_GAMES = 100;
+        private static final Path DEFAULT_OUTPUT = Path.of("build", "yacht-ai", "training-data.jsonl");
 
         static Options parse(String[] args) {
             Map<String, String> values = values(args);
-            String policy = values.getOrDefault("policy", "heuristic")
-                    .toLowerCase(Locale.ROOT);
+            YachtSimulationSplit split = YachtSimulationSplit.from(values.getOrDefault("split", "train"));
             int games = Integer.parseInt(values.getOrDefault("games", Integer.toString(DEFAULT_GAMES)));
-            YachtSimulationSplit split = YachtSimulationSplit.from(values.getOrDefault("split", "test"));
             long seedOffset = Long.parseLong(values.getOrDefault("seed-offset", "0"));
-            return new Options(policy, games, split, seedOffset);
+            int perStratumLimit = Integer.parseInt(values.getOrDefault("per-stratum-limit", "0"));
+            Path output = Path.of(values.getOrDefault("output", DEFAULT_OUTPUT.toString()));
+            return new Options(split, games, seedOffset, perStratumLimit, output);
         }
 
         private static Map<String, String> values(String[] args) {
@@ -71,10 +74,11 @@ public final class YachtSimulationCli {
         }
 
         private static boolean isSupported(String key) {
-            return key.equals("policy")
+            return key.equals("split")
                     || key.equals("games")
-                    || key.equals("split")
-                    || key.equals("seed-offset");
+                    || key.equals("seed-offset")
+                    || key.equals("per-stratum-limit")
+                    || key.equals("output");
         }
     }
 }

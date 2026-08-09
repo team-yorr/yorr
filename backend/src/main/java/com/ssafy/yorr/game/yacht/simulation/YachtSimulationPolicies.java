@@ -1,10 +1,13 @@
 package com.ssafy.yorr.game.yacht.simulation;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ssafy.yorr.game.domain.ScoreBoard;
 import com.ssafy.yorr.game.domain.ScoreCategory;
+import com.ssafy.yorr.game.yacht.DistilledYachtBotPolicy;
 import com.ssafy.yorr.game.yacht.ExpectimaxYachtBotPolicy;
 import com.ssafy.yorr.game.yacht.LocalYachtBotStrategy;
 import com.ssafy.yorr.game.yacht.ScorecardValueEvaluator;
+import com.ssafy.yorr.game.yacht.YachtBotPolicy;
 
 import java.util.Arrays;
 import java.util.List;
@@ -18,11 +21,25 @@ public final class YachtSimulationPolicies {
         return expectimax(new ExpectimaxYachtBotPolicy(new ScorecardValueEvaluator()));
     }
 
-    static YachtSimulationPolicy expectimax(ExpectimaxYachtBotPolicy policy) {
+    static YachtSimulationPolicy expectimax(YachtBotPolicy policy) {
+        return adapter("expectimax", policy);
+    }
+
+    public static YachtSimulationPolicy distilled() {
+        return adapter(
+                "distilled",
+                new DistilledYachtBotPolicy(
+                        new ExpectimaxYachtBotPolicy(new ScorecardValueEvaluator()),
+                        new ObjectMapper()
+                )
+        );
+    }
+
+    private static YachtSimulationPolicy adapter(String name, YachtBotPolicy policy) {
         return new YachtSimulationPolicy() {
             @Override
             public String name() {
-                return "expectimax";
+                return name;
             }
 
             @Override
@@ -32,6 +49,11 @@ public final class YachtSimulationPolicies {
                     case HOLD -> YachtSimulationDecision.hold(decision.held());
                     case SCORE -> YachtSimulationDecision.score(decision.category());
                 };
+            }
+
+            @Override
+            public java.util.Map<String, Double> metrics() {
+                return policy.metrics();
             }
         };
     }

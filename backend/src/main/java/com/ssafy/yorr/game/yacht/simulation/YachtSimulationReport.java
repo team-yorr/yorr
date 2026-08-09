@@ -18,11 +18,13 @@ public record YachtSimulationReport(
         double averageZeroScoreCount,
         double averageDecisionMicros,
         long elapsedMillis,
-        Map<String, CategoryStatistics> categories
+        Map<String, CategoryStatistics> categories,
+        Map<String, Double> policyMetrics
 ) {
 
     public YachtSimulationReport {
         categories = Collections.unmodifiableMap(new LinkedHashMap<>(categories));
+        policyMetrics = Collections.unmodifiableMap(new LinkedHashMap<>(policyMetrics));
     }
 
     public record CategoryStatistics(double averageScore, double zeroScoreRate) {

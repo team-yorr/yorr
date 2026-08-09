@@ -29,7 +29,7 @@ public class YachtBotTurnCoordinator {
 
     private final RoundSynchronizationService rounds;
     private final YachtTurnActionService actions;
-    private final ExpectimaxYachtBotPolicy policy;
+    private final YachtBotPolicy policy;
     private final LocalYachtBotStrategy strategy;
     private final RoomService rooms;
     private final ScoreConfirmationService scores;
@@ -37,7 +37,7 @@ public class YachtBotTurnCoordinator {
     public YachtBotTurnCoordinator(
             RoundSynchronizationService rounds,
             YachtTurnActionService actions,
-            ExpectimaxYachtBotPolicy policy,
+            YachtBotPolicy policy,
             LocalYachtBotStrategy strategy,
             RoomService rooms,
             ScoreConfirmationService scores
@@ -174,7 +174,7 @@ public class YachtBotTurnCoordinator {
             return policy.decide(board, state.activeDice(), state.activeRollCount());
         } catch (RuntimeException exception) {
             log.warn(
-                    "Expectimax 탐색에 실패해 안전 정책으로 전환합니다. round={} player={}",
+                    "Yacht bot policy failed; falling back to local heuristic. round={} player={}",
                     state.roundNumber(),
                     state.activePlayerId(),
                     exception
