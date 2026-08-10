@@ -89,6 +89,15 @@ class RoomSessionRegistryTest {
             assertThat(snapshot.isHost()).isTrue();
         });
         assertThat(registry.phaseOf("ROOM1")).isEqualTo(RoomPhase.PLAYING);
+        assertThat(registry.activeRoomCount()).isEqualTo(1);
+    }
+
+    /** phase만 먼저 기록되는 회귀가 생겨도 플레이어 없는 메타데이터는 활성 방으로 세지 않는다. */
+    @Test
+    void doesNotCountPlayingMetadataWithoutMembers() {
+        registry.markPhase("GHOST", RoomPhase.PLAYING);
+
+        assertThat(registry.activeRoomCount()).isZero();
     }
 
     @Test
@@ -120,5 +129,30 @@ class RoomSessionRegistryTest {
         assertThat(registry.of(oldSession)).isNull();
         assertThat(registry.of(replacement)).isEqualTo(reconnected);
         assertThat(registry.snapshot("ROOM1").players()).hasSize(1);
+    }
+
+    @Test
+    void restoresThePreviousOfflineMemberWhenReconnectRegistrationRollsBack() {
+        WebSocketSession oldSession = session();
+        registry.join("ROOM1", oldSession, "player-1", "플레이어", false);
+        RoomSessionRegistry.Member offline = registry.markOffline(oldSession);
+        WebSocketSession failedSession = session();
+        registry.join("ROOM1", failedSession, "player-1", "플레이어", false);
+
+        registry.rollbackJoin(failedSession, offline);
+
+        assertThat(registry.of(failedSession)).isNull();
+        assertThat(registry.find("ROOM1", "player-1")).isEqualTo(offline);
+        assertThat(registry.find("ROOM1", "player-1").status()).isEqualTo(PlayerStatus.OFFLINE);
+    }
+
+    @Test
+    void usesTheAuthoritativeHostFlagWhenRebuildingALobby() {
+        registry.join("ROOM1", session(), "participant", "참가자", false);
+        registry.join("ROOM1", session(), "host", "방장", true);
+
+        assertThat(registry.find("ROOM1", "participant").host()).isFalse();
+        assertThat(registry.find("ROOM1", "host").host()).isTrue();
+        assertThat(registry.snapshot("ROOM1").hostId()).isEqualTo("host");
     }
 }

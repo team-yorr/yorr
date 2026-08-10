@@ -26,6 +26,7 @@ class RoomCloseIntegrationTest {
 
     private static final String ROOM_CODE = "ROOM9";
     private static final String GAME_ID = "game-9";
+    private static final String GAME_CODE = "YACHT_DICE";
     private static final String HOST = "player-1";
     private static final String GUEST = "player-2";
 
@@ -72,6 +73,8 @@ class RoomCloseIntegrationTest {
         assertThat(exists(RoomRedisKeys.scoresKey(ROOM_CODE))).isFalse();
         assertThat(exists(RoomRedisKeys.botsKey(ROOM_CODE))).isFalse();
         assertThat(exists(RoomRedisKeys.gameKey(GAME_ID))).isFalse();
+        assertThat(exists(RoomRedisKeys.gameStateKey(ROOM_CODE, GAME_CODE))).isFalse();
+        assertThat(exists(RoomRedisKeys.gameStateKey(ROOM_CODE, GAME_CODE) + ":lock")).isFalse();
         for (String player : new String[] { HOST, GUEST }) {
             assertThat(exists(RoomRedisKeys.gameScoreboardKey(GAME_ID, player))).isFalse();
             assertThat(exists(RoomRedisKeys.gameScoreSubmissionsKey(GAME_ID, player))).isFalse();
@@ -110,13 +113,16 @@ class RoomCloseIntegrationTest {
 
     private void givenPlayingRoom() {
         redisTemplate.opsForHash().putAll(RoomRedisKeys.roomKey(ROOM_CODE), Map.of(
-                "capacity", "6", "members", "2", "phase", "PLAYING", "hostId", HOST, "gameId", GAME_ID));
+                "capacity", "6", "members", "2", "phase", "PLAYING", "hostId", HOST,
+                "gameId", GAME_ID, "gameCode", GAME_CODE));
         redisTemplate.opsForHash().putAll(RoomRedisKeys.playersKey(ROOM_CODE), Map.of(
                 HOST, "호스트", GUEST, "참가자"));
         redisTemplate.opsForHash().putAll(RoomRedisKeys.scoresKey(ROOM_CODE), Map.of(
                 HOST, "12", GUEST, "8"));
         redisTemplate.opsForHash().put(RoomRedisKeys.botsKey(ROOM_CODE), GUEST, "NORMAL");
         redisTemplate.opsForHash().put(RoomRedisKeys.gameKey(GAME_ID), "roomCode", ROOM_CODE);
+        redisTemplate.opsForValue().set(RoomRedisKeys.gameStateKey(ROOM_CODE, GAME_CODE), "state");
+        redisTemplate.opsForValue().set(RoomRedisKeys.gameStateKey(ROOM_CODE, GAME_CODE) + ":lock", "lock");
         for (String player : new String[] { HOST, GUEST }) {
             redisTemplate.opsForHash().put(RoomRedisKeys.gameScoreboardKey(GAME_ID, player), "choice", "12");
             redisTemplate.opsForHash().put(RoomRedisKeys.gameScoreSubmissionsKey(GAME_ID, player), "1", "choice:1,2,3,4,5");

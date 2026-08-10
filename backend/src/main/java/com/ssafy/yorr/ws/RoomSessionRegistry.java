@@ -66,6 +66,30 @@ public class RoomSessionRegistry {
         // 첫 입장자 = 방장. 최초 입장 동시성 경합은 단일 인스턴스 전제에선 무시(원자화는 42에서).
         Member existing = members.get(playerId);
         boolean host = existing != null ? existing.host() : members.isEmpty();
+        return join(members, roomId, session, playerId, nickname, host);
+    }
+
+    /** Redis 방 스냅샷처럼 권위 있는 방장 정보가 있을 때 사용하는 입장 경로. */
+    public Member join(
+            String roomId,
+            WebSocketSession session,
+            String playerId,
+            String nickname,
+            boolean host
+    ) {
+        Map<String, Member> members = rooms.computeIfAbsent(roomId, k -> new ConcurrentHashMap<>());
+        return join(members, roomId, session, playerId, nickname, host);
+    }
+
+    private Member join(
+            Map<String, Member> members,
+            String roomId,
+            WebSocketSession session,
+            String playerId,
+            String nickname,
+            boolean host
+    ) {
+        Member existing = members.get(playerId);
         Member member = new Member(
                 playerId, roomId, nickname, host, PlayerStatus.ONLINE, session);
         members.put(playerId, member);
@@ -74,6 +98,28 @@ public class RoomSessionRegistry {
         }
         bySession.put(session.getId(), member);
         return member;
+    }
+
+    /**
+     * 입장 처리 후 스냅샷 생성·응답에 실패했을 때 registry를 입장 전 상태로 되돌린다.
+     * 재접속이었다면 기존 오프라인/온라인 멤버를 복구하고, 신규 입장이었다면 새 자리만 제거한다.
+     */
+    public void rollbackJoin(WebSocketSession failedSession, Member previous) {
+        Member failed = bySession.remove(failedSession.getId());
+        if (failed == null) return;
+
+        Map<String, Member> members = rooms.get(failed.roomId());
+        if (members == null) return;
+
+        if (previous != null) {
+            if (members.replace(failed.playerId(), failed, previous) && previous.session() != null) {
+                bySession.put(previous.session().getId(), previous);
+            }
+            return;
+        }
+
+        members.remove(failed.playerId(), failed);
+        removeRoomMetadataIfEmpty(failed.roomId(), members);
     }
 
     /** 방 안에서 이 playerId가 차지하고 있는 자리. 재접속과 중복 세션 판정에 사용한다. */
@@ -93,12 +139,7 @@ public class RoomSessionRegistry {
         Map<String, Member> members = rooms.get(member.roomId());
         if (members != null) {
             members.remove(member.playerId());
-            if (members.isEmpty()) {
-                rooms.remove(member.roomId());
-                gameCodes.remove(member.roomId());
-                phases.remove(member.roomId()); // 방 코드가 재사용돼도 이전 단계가 남지 않도록 같이 버린다.
-                voiceMembers.remove(member.roomId());
-            }
+            removeRoomMetadataIfEmpty(member.roomId(), members);
         }
         return member;
     }
@@ -139,13 +180,15 @@ public class RoomSessionRegistry {
         if (member.session() != null) {
             bySession.remove(member.session().getId(), member);
         }
-        if (members.isEmpty()) {
-            rooms.remove(roomId);
-            gameCodes.remove(roomId);
-            phases.remove(roomId);
-            voiceMembers.remove(roomId);
-        }
+        removeRoomMetadataIfEmpty(roomId, members);
         return member;
+    }
+
+    private void removeRoomMetadataIfEmpty(String roomId, Map<String, Member> members) {
+        if (!members.isEmpty() || !rooms.remove(roomId, members)) return;
+        gameCodes.remove(roomId);
+        phases.remove(roomId); // 방 코드가 재사용돼도 이전 단계가 남지 않도록 같이 버린다.
+        voiceMembers.remove(roomId);
     }
 
     /* ----- 음성 채널(voice.*) 명단 -----
@@ -194,8 +237,9 @@ public class RoomSessionRegistry {
 
     /** 현재 게임을 진행 중인 방의 수. */
     public long activeRoomCount() {
-        return phases.values().stream()
-                .filter(RoomPhase.PLAYING::equals)
+        return rooms.entrySet().stream()
+                .filter(entry -> !entry.getValue().isEmpty())
+                .filter(entry -> phaseOf(entry.getKey()) == RoomPhase.PLAYING)
                 .count();
     }
 

@@ -189,12 +189,11 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
                     "방이 종료됐습니다. 홈에서 새로 시작해 주세요.", in.msgId());
             return;
         }
-        registry.registerGame(payload.roomId(), persistentRoom.gameCode());
-        registry.markPhase(payload.roomId(), switch (persistentRoom.phase()) {
+        RoomPhase persistentPhase = switch (persistentRoom.phase()) {
             case LOBBY -> RoomPhase.WAITING;
             case PLAYING -> RoomPhase.PLAYING;
             case FINISHED -> RoomPhase.FINISHED;
-        });
+        };
 
         // --- 정체성 확정 (seam: resolveIdentity 하나로 격리 — 재접속 구현 시 여기만 교체) ---
         final Identity id;
@@ -213,44 +212,77 @@ public class GameWebSocketHandler extends TextWebSocketHandler {
 
         RoomSessionRegistry.Member previous = registry.find(payload.roomId(), id.playerId());
         boolean reconnecting = previous != null;
-        if (registry.phaseOf(payload.roomId()) == RoomPhase.PLAYING && !reconnecting) {
+        if (persistentPhase == RoomPhase.PLAYING && !reconnecting) {
             sendError(session, WsErrorCode.GAME_ALREADY_STARTED,
                     "이미 시작된 게임에는 새로 참가할 수 없습니다.", in.msgId());
             return;
         }
 
-        // (1) 명단 등록. 같은 playerId면 자리와 host를 유지하고 새 소켓으로 교체한다.
-        RoomSessionRegistry.Member self = registry.join(payload.roomId(), session, id.playerId(), id.nickname());
-        disconnectPreviousSession(previous, session);
+        // 모든 거절 조건을 통과한 뒤에만 registry를 바꾼다. Redis가 권위자이므로 방장도
+        // "먼저 재접속한 사람"이 아니라 persistent hostId를 그대로 복원한다.
+        RoomSessionRegistry.Member self = registry.join(
+                payload.roomId(),
+                session,
+                id.playerId(),
+                id.nickname(),
+                id.playerId().equals(persistentRoom.hostId())
+        );
+        try {
+            registry.registerGame(payload.roomId(), persistentRoom.gameCode());
+            registry.markPhase(payload.roomId(), persistentPhase);
+        } catch (RuntimeException exception) {
+            registry.rollbackJoin(session, previous);
+            throw exception;
+        }
 
         if (reconnecting) {
-            broadcaster.register(payload.roomId(), session);
             final RoomSnapshot snapshot;
             try {
                 snapshot = game(payload.roomId()).reconnect(payload.roomId(), id.playerId());
             } catch (RuntimeException exception) {
                 log.error("재접속 상태 스냅샷 생성 실패: player={} room={}",
                         id.playerId(), payload.roomId(), exception);
-                broadcaster.unregister(session);
+                registry.rollbackJoin(session, previous);
                 sendError(session, WsErrorCode.INTERNAL,
                         "게임 상태를 복원하지 못했습니다. 잠시 후 다시 시도해 주세요.", in.msgId());
                 return;
             }
-            send(session, WsEnvelope.of("sys.reconnected", new SysReconnectedPayload(snapshot))
-                    .withRoomId(payload.roomId())
-                    .withMsgId(in.msgId()));
+            broadcaster.register(payload.roomId(), session);
+            try {
+                send(session, WsEnvelope.of("sys.reconnected", new SysReconnectedPayload(snapshot))
+                        .withRoomId(payload.roomId())
+                        .withMsgId(in.msgId()));
+            } catch (IOException | RuntimeException exception) {
+                broadcaster.unregister(session);
+                registry.rollbackJoin(session, previous);
+                throw exception;
+            }
+            // 새 연결이 완전히 준비된 뒤에만 이전 소켓을 끊는다. 복원 실패가 기존 연결까지
+            // 제거하면 다음 재시도도 신규 입장으로 오판한다.
+            disconnectPreviousSession(previous, session);
             // 복귀했으니 오프라인 결석은 처음부터 다시 센다 — 안 지우면 한참 뒤의 짧은 끊김 한 번에 퇴장당한다.
             broadcastPresence(payload.roomId(), id.playerId(), PlayerStatus.ONLINE);
             log.info("room.reconnected: player={} room={}", id.playerId(), payload.roomId());
             return;
         }
 
-        RoomSnapshot snapshot = realtimeSnapshots.snapshot(payload.roomId()); // Redis 참가자 + 사람 접속 상태
+        final RoomSnapshot snapshot;
+        try {
+            snapshot = realtimeSnapshots.snapshot(payload.roomId()); // Redis 참가자 + 사람 접속 상태
+        } catch (RuntimeException exception) {
+            registry.rollbackJoin(session, null);
+            throw exception;
+        }
 
         // (2) 본인에게: room.joined (발급 playerId·세션토큰·전체 스냅샷). 본인에게만.
-        send(session, WsEnvelope.of("room.joined",
-                        new RoomJoinedPayload(id.playerId(), id.sessionToken(), snapshot))
-                .withRoomId(payload.roomId()));
+        try {
+            send(session, WsEnvelope.of("room.joined",
+                            new RoomJoinedPayload(id.playerId(), id.sessionToken(), snapshot))
+                    .withRoomId(payload.roomId()));
+        } catch (IOException | RuntimeException exception) {
+            registry.rollbackJoin(session, null);
+            throw exception;
+        }
 
         // (3) 기존 멤버에게만: room.player_joined (본인은 아직 팬아웃 미등록 → 안 받음)
         //     접속 자체는 player_joined(Player.status 포함)가 알리므로 여기서 presence는 쏘지 않는다.

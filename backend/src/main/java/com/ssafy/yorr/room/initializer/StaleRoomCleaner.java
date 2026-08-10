@@ -6,8 +6,8 @@ import com.ssafy.yorr.room.service.RoomService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
-import org.springframework.context.event.EventListener;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,14 +35,19 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-public class StaleRoomCleaner {
+public class StaleRoomCleaner implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(StaleRoomCleaner.class);
 
     private final RoomCreateService roomCreateService;
     private final RoomService roomService;
 
-    @EventListener(ApplicationReadyEvent.class)
+    /** readiness가 열리기 전에 정리를 끝내 새 연결과 부팅 정리가 경합하지 않게 한다. */
+    @Override
+    public void run(ApplicationArguments args) {
+        closeUnrecoverableGamesOnStartup();
+    }
+
     public void closeUnrecoverableGamesOnStartup() {
         // 부팅 직후라 마감 타이머가 하나도 걸려 있지 않다 = PLAYING이면 이어갈 수 없다는 뜻이다.
         // (라운드 상태는 Redis에 남아 있지만 그것만으로는 턴이 진행되지 않는다.)

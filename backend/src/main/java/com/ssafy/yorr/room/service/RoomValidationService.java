@@ -106,6 +106,7 @@ public class RoomValidationService implements RoomService {
      */
     private static final DefaultRedisScript<Long> CLOSE = new DefaultRedisScript<>("""
             local gameId = redis.call('HGET', KEYS[1], 'gameId')
+            local gameCode = redis.call('HGET', KEYS[1], 'gameCode')
             if gameId then
                 local players = redis.call('HKEYS', KEYS[2])
                 for i = 1, #players do
@@ -113,6 +114,11 @@ public class RoomValidationService implements RoomService {
                     redis.call('DEL', 'game:' .. gameId .. ':score-submissions:' .. players[i])
                 end
                 redis.call('DEL', 'game:' .. gameId)
+            end
+            if gameCode then
+                local stateKey = KEYS[1] .. ':game:' .. gameCode .. ':state'
+                redis.call('DEL', stateKey)
+                redis.call('DEL', stateKey .. ':lock')
             end
             redis.call('DEL', KEYS[1])
             redis.call('DEL', KEYS[2])

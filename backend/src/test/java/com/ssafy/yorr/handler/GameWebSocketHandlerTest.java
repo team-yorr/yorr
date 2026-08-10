@@ -27,6 +27,7 @@ import com.ssafy.yorr.ws.HeartbeatMonitor;
 import com.ssafy.yorr.ws.RoomSessionRegistry;
 import com.ssafy.yorr.ws.RealtimeRoomSnapshotService;
 import com.ssafy.yorr.ws.dto.RoomJoinPayload;
+import com.ssafy.yorr.ws.dto.PlayerStatus;
 import com.ssafy.yorr.ws.dto.DiceHoldPayload;
 import com.ssafy.yorr.ws.dto.DiceRollPayload;
 import com.ssafy.yorr.ws.dto.RoundSubmitPayload;
@@ -37,7 +38,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
-import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketMessage;
 import org.springframework.web.socket.WebSocketSession;
 import tools.jackson.databind.ObjectMapper;
@@ -567,20 +567,67 @@ class GameWebSocketHandlerTest {
     @Test
     void rejectsNewPlayerJoiningAnActiveGame() throws Exception {
         UserService userService = mock(UserService.class);
+        // 재배포 직후처럼 Redis 방만 남고 새 프로세스의 registry는 완전히 빈 상태다.
+        registry = new RoomSessionRegistry();
         handler = handlerWith(userService);
         when(userService.authenticateSession("token-b"))
                 .thenReturn(new UserIdentity("player-b", "Player B", UserType.GUEST));
         when(roomService.getSnapshot("room-a")).thenReturn(new RoomSnapshot(
                 "room-a", YachtDiceGameModule.CODE, "game-a", "player-a",
                 RoomPhase.PLAYING, 2, List.of()));
-        registry.join("room-a", session("existing-session"), "player-a", "Player A");
-
         WebSocketSession newcomer = session("newcomer-session");
         handler.handle(newcomer, joinMessage("token-b", "join-active"));
 
         String response = singleResponse(newcomer);
         assertThat(response).contains("\"code\":\"GAME_ALREADY_STARTED\"");
         assertThat(registry.of(newcomer)).isNull();
+        assertThat(registry.gameCodeOf("room-a")).isNull();
+        assertThat(registry.activeRoomCount()).isZero();
+        assertThat(registry.snapshot("room-a").players()).isEmpty();
+    }
+
+    @Test
+    void restoresOfflineMembershipWhenReconnectSnapshotFails() throws Exception {
+        UserService userService = mock(UserService.class);
+        handler = handlerWith(userService);
+        when(userService.authenticateSession("token-a"))
+                .thenReturn(new UserIdentity("player-a", "Player A", UserType.GUEST));
+        when(roomService.getSnapshot("room-a")).thenReturn(new RoomSnapshot(
+                "room-a", YachtDiceGameModule.CODE, "game-a", "player-a",
+                RoomPhase.PLAYING, 2, List.of()));
+
+        WebSocketSession oldSession = session("old-session");
+        registry.join("room-a", oldSession, "player-a", "Player A", true);
+        registry.markPhase("room-a", com.ssafy.yorr.ws.dto.RoomPhase.PLAYING);
+        RoomSessionRegistry.Member offline = registry.markOffline(oldSession);
+        when(reconnectSnapshotService.snapshot("room-a", "player-a"))
+                .thenThrow(new IllegalStateException("missing deadline"));
+
+        WebSocketSession replacement = session("replacement-session");
+        handler.handle(replacement, joinMessage("token-a", "reconnect-failed"));
+
+        assertThat(singleResponse(replacement)).contains("\"code\":\"INTERNAL\"");
+        assertThat(registry.of(replacement)).isNull();
+        assertThat(registry.find("room-a", "player-a")).isEqualTo(offline);
+        assertThat(registry.find("room-a", "player-a").status()).isEqualTo(PlayerStatus.OFFLINE);
+        verify(oldSession, never()).close(any());
+    }
+
+    @Test
+    void rebuildsLobbyHostFromRedisInsteadOfReconnectOrder() throws Exception {
+        UserService userService = mock(UserService.class);
+        registry = new RoomSessionRegistry();
+        handler = handlerWith(userService);
+        when(userService.authenticateSession("token-a"))
+                .thenReturn(new UserIdentity("player-a", "Player A", UserType.GUEST));
+        when(roomService.getSnapshot("room-a")).thenReturn(new RoomSnapshot(
+                "room-a", YachtDiceGameModule.CODE, null, "player-b",
+                RoomPhase.LOBBY, 2, List.of()));
+
+        WebSocketSession firstReconnect = session("first-reconnect");
+        handler.handle(firstReconnect, joinMessage("token-a", "lobby-reconnect"));
+
+        assertThat(registry.find("room-a", "player-a").host()).isFalse();
     }
 
     /**
