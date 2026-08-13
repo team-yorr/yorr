@@ -182,6 +182,17 @@ Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 일부 통
 - [요트 다이스 규칙](frontend/docs/product/yacht-rules.md)
 - [백엔드 게임 세션 연동](backend/GAME_SESSION_INTEGRATION.md)
 
+## 팀 구성
+
+| 이름 | 역할 | 담당 |
+|---|---|---|
+| 이정현 | PM · 팀장 | WebSocket 이벤트 프로토콜 설계(sys·room·dice·reaction·voice), WebRTC 풀메시 음성 채팅(BE 시그널링 + FE), 오디오 시스템(족보 콜아웃·굴림 사운드·iOS 대응), 게임 종료 판정, 릴리스 관리 |
+| 박재영 | Backend | 게스트 세션 관리, 방 생성·참가, 게임 상태 Redis 저장, WebSocket 재연결, 게임 모듈화·빠른 대전 |
+| 고용훈 | Backend | 실시간 게임 서버 코어 — 서버 권위 주사위 생성·라운드 타이머·턴 마감 자동 굴림, Redis 방 상태 관리(sliding TTL·고아 라운드 스윕·빈 방 정리), 카카오·구글 소셜 로그인과 회원/프로필 API, 경기 결과 영구 저장 + 주간 랭킹 API, '석양이 진다' 서버 이식 |
+| 정유진 | Frontend | 프론트엔드 개발환경·API 기반 구축, 입장/대기실·QR 초대·세션 복구, 3D 주사위·모션 조작, 파티/빠른대전·폰 컨트롤러, 라이어스 다이스·요트·AI 탁구, 반응형 UI·디자인 시스템, 구조 리팩터링, QA·테스트·문서화 |
+| 유상은 | AI · Backend | Expectimax 기반 요트 AI 봇, 탁구 게임 이식 및 파티 컨트롤러 |
+| 이유정 | Infra | EC2 개발·운영 환경 설정, Jenkins CI/CD 파이프라인, Prometheus·Grafana 모니터링 |
+
 ## 협업 규칙
 
 Git 작업 규칙의 단일 기준은 [CONTRIBUTING.md](CONTRIBUTING.md)입니다. `main`과 `develop`에는
