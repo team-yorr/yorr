@@ -198,9 +198,3 @@ Windows에서는 `./gradlew` 대신 `gradlew.bat`을 사용합니다. 일부 통
 Git 작업 규칙의 단일 기준은 [CONTRIBUTING.md](CONTRIBUTING.md)입니다. `main`과 `develop`에는
 직접 커밋하지 않으며, Jira 이슈 단위의 작업 브랜치에서 변경한 뒤 리뷰를 거쳐 `develop`으로
 Merge Request를 생성합니다.
-
----
-
-<div align="center">
-  SSAFY 15기 공통 프로젝트 · S15P11A406
-</div>
