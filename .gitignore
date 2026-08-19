@@ -23,6 +23,7 @@ Thumbs.db
 # CodeGraph index
 .codegraph/
 
-# Local planning and reference materials
-/docs/
+# Local planning and reference materials (단, README용 이미지는 추적)
+/docs/*
+!/docs/*.png
 /.dev.md

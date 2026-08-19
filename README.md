@@ -25,6 +25,17 @@ YORR는 별도 앱 설치 없이 모바일 브라우저에서 즐길 수 있는 
 
 라이어스 다이스와 낚시는 현재 준비 중입니다.
 
+<table>
+  <tr>
+    <td><img src="docs/play-mode.png" alt="플레이 모드 선택" width="100%" /></td>
+    <td><img src="docs/play-game.png" alt="게임 플레이 화면" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center">플레이 모드 선택</td>
+    <td align="center">게임 플레이</td>
+  </tr>
+</table>
+
 ## 주요 기능
 
 - 게스트 입장 및 카카오·구글 소셜 로그인
@@ -49,6 +60,8 @@ YORR는 별도 앱 설치 없이 모바일 브라우저에서 즐길 수 있는 
 | Infra | Docker Compose, Jenkins, Vercel, Prometheus |
 
 ## 아키텍처
+
+<img src="docs/architecture.png" alt="YORR 시스템 아키텍처" width="100%" />
 
 ```text
 Mobile / Desktop Browser
